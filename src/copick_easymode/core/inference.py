@@ -126,6 +126,7 @@ def run_easymode_inference(
     session_id: str,
     tta: int = 4,
     batch_size: int = 1,
+    threshold: float = 0.5,
     gpus: Optional[str] = None,
     add_objects: bool = True,
     overwrite: bool = False,
@@ -145,6 +146,7 @@ def run_easymode_inference(
         session_id: Session ID for created segmentations.
         tta: Test-time augmentation level (1-16).
         batch_size: Batch size for inference.
+        threshold: Probability threshold for binarizing segmentation (0.0-1.0).
         gpus: Comma-separated GPU IDs (e.g., '0,1'). None for auto-detect.
         add_objects: Whether to add object definitions if missing.
         overwrite: Whether to overwrite existing segmentations.
@@ -279,8 +281,8 @@ def run_easymode_inference(
                     batch_size=batch_size,
                 )
 
-                # Convert to uint8 (0-255 range)
-                seg_data = (seg_data * 255).clip(0, 255).astype(np.uint8)
+                # Binarize using threshold and convert to uint8 (0 or 1)
+                seg_data = (seg_data >= threshold).astype(np.uint8)
 
                 # Create or get segmentation
                 if existing_segs and overwrite:

@@ -12,7 +12,7 @@ from copick.cli.util import add_config_option, add_debug_option, add_user_sessio
 
 def add_easymode_inference_options(func: click.Command) -> click.Command:
     """
-    Add easymode inference options: --gpus, --tta, --batch-size.
+    Add easymode inference options: --gpus, --tta, --batch-size, --threshold.
 
     Args:
         func (click.Command): The Click command to which the options will be added.
@@ -43,6 +43,14 @@ def add_easymode_inference_options(func: click.Command) -> click.Command:
             default=1,
             show_default=True,
             help="Batch size for inference.",
+        ),
+        click.option(
+            "--threshold",
+            required=False,
+            type=float,
+            default=0.5,
+            show_default=True,
+            help="Probability threshold for binarizing segmentation (0.0-1.0).",
         ),
     ]
 
@@ -129,6 +137,7 @@ def easymode(
     gpus: str,
     tta: int,
     batch_size: int,
+    threshold: float,
     user_id: str,
     session_id: str,
     add_objects: bool,
@@ -229,7 +238,7 @@ def easymode(
     logger.info(f"Models: {model_list}")
     logger.info(f"Tomogram: {tomo_type}@{voxel_size}")
     logger.info(f"Runs: {run_list if run_list else 'all'}")
-    logger.info(f"TTA: {tta}, Batch size: {batch_size}")
+    logger.info(f"TTA: {tta}, Batch size: {batch_size}, Threshold: {threshold}")
     logger.info(f"GPUs: {gpus if gpus else 'auto'}")
     logger.info(f"Add objects: {add_objects}, Overwrite: {overwrite}")
 
@@ -245,6 +254,7 @@ def easymode(
             session_id=session_id,
             tta=tta,
             batch_size=batch_size,
+            threshold=threshold,
             gpus=gpus,
             add_objects=add_objects,
             overwrite=overwrite,
