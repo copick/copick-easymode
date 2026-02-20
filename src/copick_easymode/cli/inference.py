@@ -10,82 +10,130 @@ import click
 from copick.cli.util import add_config_option, add_debug_option, add_user_session_options
 
 
+def add_easymode_inference_options(func: click.Command) -> click.Command:
+    """
+    Add easymode inference options: --gpus, --tta, --batch-size.
+
+    Args:
+        func (click.Command): The Click command to which the options will be added.
+
+    Returns:
+        click.Command: The Click command with the inference options added.
+    """
+    opts = [
+        click.option(
+            "--gpus",
+            required=False,
+            type=str,
+            default=None,
+            help="Comma-separated GPU IDs (e.g., '0,1'). Default: all available.",
+        ),
+        click.option(
+            "--tta",
+            required=False,
+            type=int,
+            default=4,
+            show_default=True,
+            help="Test-time augmentation level (1-16). Higher = better but slower.",
+        ),
+        click.option(
+            "--batch-size",
+            required=False,
+            type=int,
+            default=1,
+            show_default=True,
+            help="Batch size for inference.",
+        ),
+    ]
+
+    for opt in opts:
+        func = opt(func)
+
+    return func
+
+
+def add_object_overwrite_options(func: click.Command) -> click.Command:
+    """
+    Add object and overwrite options: --add-objects, --overwrite.
+
+    Args:
+        func (click.Command): The Click command to which the options will be added.
+
+    Returns:
+        click.Command: The Click command with the object/overwrite options added.
+    """
+    opts = [
+        click.option(
+            "--add-objects/--no-add-objects",
+            is_flag=True,
+            default=True,
+            show_default=True,
+            help="Add object definitions to config if missing.",
+        ),
+        click.option(
+            "--overwrite/--no-overwrite",
+            is_flag=True,
+            default=False,
+            show_default=True,
+            help="Overwrite existing segmentations.",
+        ),
+    ]
+
+    for opt in opts:
+        func = opt(func)
+
+    return func
+
+
 @click.command(
     name="easymode",
     short_help="Segment tomograms using easymode pretrained models.",
     context_settings={"show_default": True},
     no_args_is_help=True,
 )
+@add_config_option
 @click.option(
     "--model",
     "-m",
     "models",
-    type=str,
     required=True,
+    type=str,
     help="Comma-separated list of models/features to run (e.g., 'ribosome,membrane').",
 )
 @click.option(
     "--tomogram",
     "-t",
-    type=str,
     required=True,
+    type=str,
     help="Tomogram URI in format 'type@voxel_size' (e.g., 'wbp@10.0').",
 )
 @click.option(
     "--run",
     "-r",
+    required=False,
     type=str,
     default="",
     help="Run name or comma-separated list of runs. Empty = all runs.",
 )
-@click.option(
-    "--gpus",
-    type=str,
-    default=None,
-    help="Comma-separated GPU IDs (e.g., '0,1'). Default: all available.",
-)
-@click.option(
-    "--tta",
-    type=int,
-    default=4,
-    help="Test-time augmentation level (1-16). Higher = better but slower.",
-)
-@click.option(
-    "--batch-size",
-    type=int,
-    default=1,
-    help="Batch size for inference.",
-)
-@click.option(
-    "--add-objects/--no-add-objects",
-    is_flag=True,
-    default=True,
-    help="Add object definitions to config if missing.",
-)
-@click.option(
-    "--overwrite/--no-overwrite",
-    is_flag=True,
-    default=False,
-    help="Overwrite existing segmentations.",
-)
-@add_config_option
-@add_debug_option
+@add_easymode_inference_options
 @add_user_session_options
+@add_object_overwrite_options
+@add_debug_option
 @click.pass_context
 def easymode(
     ctx: click.Context,
+    config: str,
     models: str,
     tomogram: str,
     run: str,
     gpus: str,
     tta: int,
     batch_size: int,
-    add_objects: bool,
-    overwrite: bool,
-    config: str,
-    debug: bool,
     user_id: str,
     session_id: str,
+    add_objects: bool,
+    overwrite: bool,
+    debug: bool,
 ):
     """
     Segment copick tomograms using easymode pretrained models.
@@ -96,6 +144,12 @@ def easymode(
 
     Available models include: ribosome, membrane, microtubule, actin, cytoplasm,
     mitochondrion, nucleus, nuclear_envelope, npc, and more.
+
+    \b
+    Acknowledgements:
+        This command uses pretrained models from easymode by Mart G.F. Last.
+        Repository: https://github.com/mgflast/easymode
+        If you use these models in your research, please cite the easymode authors.
 
     \b
     Examples:
@@ -128,6 +182,10 @@ def easymode(
     from copick_easymode.core.inference import run_easymode_inference
 
     logger = get_logger(__name__, debug=debug)
+
+    # Acknowledge easymode authors
+    logger.info("Using easymode pretrained models by Mart G.F. Last - https://github.com/mgflast/easymode")
+    logger.info("If you use these models, please cite the easymode authors.")
 
     # Validate config
     if not config:

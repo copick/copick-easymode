@@ -12,14 +12,14 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     "click>=8.1.8",
-    "copick>=0.8.0",
+    "copick>=1.20.0",
     "easymode",
     "numpy>=2.0.2",
     "scipy>=1.10.0",
     "tensorflow>=2.10.0",
 ]
 authors = [
-    { name = "Utz H. Ermel", email = "utz.ermel@czii.org" },
+    { name = "Utz H. Ermel", email = "utz@ermel.me" },
 ]
 description = "Easymode pretrained segmentation integration for copick CLI."
 readme = "README.md"

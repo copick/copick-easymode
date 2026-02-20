@@ -2,7 +2,8 @@
 
 Easymode pretrained segmentation integration for copick CLI.
 
-This plugin provides CLI commands to run [easymode](https://github.com/kephale/easymode) pretrained segmentation models on tomograms stored in copick projects.
+This plugin provides CLI commands to run [easymode](https://github.com/mgflast/easymode) pretrained segmentation models
+on tomograms stored in copick projects. If you use this plugin, please cite the easymode authors.
 
 ## Installation
 
