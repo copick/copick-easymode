@@ -157,7 +157,8 @@ def easymode(
     \b
     Acknowledgements:
         This command uses pretrained models from easymode by Mart G.F. Last.
-        Repository: https://github.com/mgflast/easymode
+        Docs: https://mgflast.github.io/easymode
+        Repo: https://github.com/mgflast/easymode
         If you use these models in your research, please cite the easymode authors.
 
     \b
@@ -193,7 +194,8 @@ def easymode(
     logger = get_logger(__name__, debug=debug)
 
     # Acknowledge easymode authors
-    logger.info("Using easymode pretrained models by Mart G.F. Last - https://github.com/mgflast/easymode")
+    logger.info("Using easymode pretrained models by Mart G.F. Last")
+    logger.info("Docs: https://mgflast.github.io/easymode | Repo: https://github.com/mgflast/easymode")
     logger.info("If you use these models, please cite the easymode authors.")
 
     # Validate config

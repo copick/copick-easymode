@@ -3,15 +3,10 @@
 Easymode pretrained segmentation integration for copick CLI.
 
 This plugin provides CLI commands to run [easymode](https://github.com/mgflast/easymode) pretrained segmentation models
-on tomograms stored in copick projects. If you use this plugin, please cite the easymode authors.
+on tomograms stored in copick projects. For more information about easymode, visit the [documentation](https://mgflast.github.io/easymode).
+If you use this plugin, please cite the easymode authors.
 
 ## Installation
-
-```bash
-pip install copick-easymode
-```
-
-Or for development:
 
 ```bash
 git clone https://github.com/copick/copick-easymode.git
