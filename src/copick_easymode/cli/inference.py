@@ -6,7 +6,6 @@ pretrained segmentation models on copick data.
 """
 
 import click
-
 from copick.cli.util import add_config_option, add_debug_option, add_user_session_options
 
 
@@ -186,7 +185,6 @@ def easymode(
     """
     # Deferred imports for CLI performance
     import copick
-
     from copick.util.log import get_logger
 
     from copick_easymode.core.inference import run_easymode_inference
