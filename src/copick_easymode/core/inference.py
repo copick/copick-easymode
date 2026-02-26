@@ -5,6 +5,7 @@ This module provides functions to run easymode pretrained segmentation models
 on copick tomograms and store the results back to copick.
 """
 
+import contextlib
 import gc
 import os
 from typing import TYPE_CHECKING, Optional
@@ -41,10 +42,9 @@ def segment_tomogram_from_array(
     Returns:
         Segmentation probability map as numpy array (float32, values 0-1).
     """
-    from scipy.ndimage import zoom
-
     # Import easymode inference functions
     from easymode.segmentation.inference import _pad_volume, _segment_tomogram_instance
+    from scipy.ndimage import zoom
 
     volume = volume.astype(np.float32)
     oj, ok, ol = volume.shape
@@ -157,7 +157,6 @@ def run_easymode_inference(
         Dictionary with processing statistics: processed, skipped, errors.
     """
     import tensorflow as tf
-
     from easymode.core.distribution import get_model, load_model
 
     stats = {"processed": 0, "skipped": 0, "errors": []}
@@ -168,10 +167,9 @@ def run_easymode_inference(
 
     # Enable memory growth to avoid allocating all GPU memory at once
     for device in tf.config.list_physical_devices("GPU"):
-        try:
+        # Memory growth must be set before GPUs have been initialized
+        with contextlib.suppress(RuntimeError):
             tf.config.experimental.set_memory_growth(device, True)
-        except RuntimeError:
-            pass  # Memory growth must be set before GPUs have been initialized
 
     # Get runs to process
     runs = root.runs
@@ -287,7 +285,7 @@ def run_easymode_inference(
                 # Create or get segmentation
                 if existing_segs and overwrite:
                     # Delete existing segmentation first
-                    for existing_seg in existing_segs:
+                    for _existing_seg in existing_segs:
                         # Note: copick doesn't have a delete method, so we overwrite via exist_ok
                         pass
 
