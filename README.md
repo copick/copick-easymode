@@ -109,4 +109,4 @@ Each segmentation is stored as a zarr array with OME-Zarr metadata.
 
 ## License
 
-MIT License
+GPLv3 License
