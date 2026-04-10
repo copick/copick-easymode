@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.1.1...copick-easymode-v0.1.2) (2026-04-10)
+
+
+### Bug Fixes
+
+* bump chanzuckerberg/github-actions from 6.13.1 to 6.18.1 ([#9](https://github.com/copick/copick-easymode/issues/9)) ([fe20a6a](https://github.com/copick/copick-easymode/commit/fe20a6aefa4a32e5a18d4570debc2a5402cbb871))
+* resolve Python and TensorFlow version constraints  ([#10](https://github.com/copick/copick-easymode/issues/10)) ([ce0bb0d](https://github.com/copick/copick-easymode/commit/ce0bb0d9ce7f371fe375a51849e2d795dac15c19))
+
 ## [0.1.1](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.1.0...copick-easymode-v0.1.1) (2026-02-26)
 
 
