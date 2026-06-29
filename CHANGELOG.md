@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.3](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.1.2...copick-easymode-v0.1.3) (2026-06-29)
+
+
+### Bug Fixes
+
+* bump actions/checkout from 6 to 7 ([#18](https://github.com/copick/copick-easymode/issues/18)) ([c02235c](https://github.com/copick/copick-easymode/commit/c02235c1d06928662d69cd8803070d0f67a57acc))
+* bump chanzuckerberg/github-actions from 6.18.1 to 6.25.0 ([#19](https://github.com/copick/copick-easymode/issues/19)) ([a5096a1](https://github.com/copick/copick-easymode/commit/a5096a1b057f681a94cbb7407288b1076a0bf466))
+* bump googleapis/release-please-action from 4 to 5 ([#14](https://github.com/copick/copick-easymode/issues/14)) ([ef303a4](https://github.com/copick/copick-easymode/commit/ef303a419bd1095f873dc17edf6ef8acb6feb101))
+
 ## [0.1.2](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.1.1...copick-easymode-v0.1.2) (2026-04-10)
 
 
