@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.1.3...copick-easymode-v0.1.4) (2026-06-29)
+
+
+### Bug Fixes
+
+* Changes necessary for docs gen ([#21](https://github.com/copick/copick-easymode/issues/21)) ([f99973e](https://github.com/copick/copick-easymode/commit/f99973ead85aab07f04ed2258acf407032753053))
+
 ## [0.1.3](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.1.2...copick-easymode-v0.1.3) (2026-06-29)
 
 
