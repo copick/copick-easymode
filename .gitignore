@@ -1,0 +1,15 @@
+# Local reference clone of easymode (installed from GitHub at runtime, not vendored here)
+/easymode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Editors
+.idea/
+.vscode/

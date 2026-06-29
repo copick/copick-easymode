@@ -2,16 +2,38 @@
 
 Easymode pretrained segmentation integration for copick CLI.
 
+**[Preprint](https://www.biorxiv.org/content/10.64898/2026.05.19.726344v1) | [easymode docs](https://mgflast.github.io/easymode) | [easymode repo](https://github.com/mgflast/easymode)**
+
 This plugin provides CLI commands to run [easymode](https://github.com/mgflast/easymode) pretrained segmentation models
 on tomograms stored in copick projects. For more information about easymode, visit the [documentation](https://mgflast.github.io/easymode).
-If you use this plugin, please cite the easymode authors.
+If you use this plugin, please cite the easymode preprint (see [Citation](#citation)).
 
 ## Installation
+
+easymode 1.0.0 is not published to PyPI (only older `0.0.x` releases are), so it is installed
+from GitHub. Its packaging metadata also (incorrectly) pins `numpy<2` / `tensorflow<2.12`, which
+conflicts with copick's `numpy>=2` — even though easymode runs fine on `numpy>=2`. To avoid that
+conflict, install copick-easymode and its dependencies **first** (this brings in copick and
+`numpy>=2`), then install easymode from GitHub with `--no-deps` so its bad pins are ignored:
 
 ```bash
 git clone https://github.com/copick/copick-easymode.git
 cd copick-easymode
+
+# 1. Install copick-easymode + dependencies (copick, numpy>=2, tensorflow>=2.16, easymode's runtime deps)
 pip install -e .
+
+# 2. Install easymode from GitHub WITHOUT dependency resolution.
+#    --no-deps keeps your numpy>=2 stack intact, and also upgrades over any older easymode
+#    (e.g. a 0.0.x already installed from PyPI).
+pip install --no-deps git+https://github.com/mgflast/easymode.git
+```
+
+Verify the install:
+
+```bash
+python -c "import numpy, easymode, importlib.metadata as m; print('numpy', numpy.__version__, '| easymode', m.version('easymode'))"
+# expected: numpy 2.x | easymode 1.0.0
 ```
 
 ## Usage
@@ -102,10 +124,17 @@ Each segmentation is stored as a zarr array with OME-Zarr metadata.
 
 ## Requirements
 
-- Python >= 3.10
-- copick >= 0.8.0
-- easymode
-- TensorFlow >= 2.10.0
+- Python >= 3.10, < 3.13
+- copick >= 1.24.1
+- numpy >= 2.0.2
+- TensorFlow >= 2.16
+- easymode (installed separately from GitHub — see [Installation](#installation))
+
+## Citation
+
+This plugin runs the pretrained **easymode** models. If you use it in your research, please cite the easymode preprint:
+
+> So-Last, M. G. F., Hale, T., Burt, A., & Allegretti, M. (2026). *Easymode: general pretrained networks for cellular cryo-ET enable flexible approaches to subtomogram averaging.* bioRxiv. https://www.biorxiv.org/content/10.64898/2026.05.19.726344v1
 
 ## License
 
