@@ -4,7 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "copick-easymode"
-requires-python = ">=3.9,<3.11"
+# Floor only: the thin CLI wrapper is pure-Python and imports its heavy deps
+# (easymode/TensorFlow) lazily, so it installs (e.g. `--no-deps` for CLI-docs
+# introspection) on any modern Python. A full install still needs an
+# easymode/TensorFlow-compatible interpreter.
+requires-python = ">=3.9"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
