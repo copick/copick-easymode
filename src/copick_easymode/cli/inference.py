@@ -201,9 +201,11 @@ def easymode(
     logger = get_logger(__name__, debug=debug)
 
     # Acknowledge easymode authors
-    logger.info("Using easymode pretrained models by Mart G.F. Last")
-    logger.info("Docs: https://mgflast.github.io/easymode | Repo: https://github.com/mgflast/easymode")
-    logger.info("If you use these models, please cite the easymode authors.")
+    logger.info("Using easymode pretrained models by Mart G. F. So-Last et al.")
+    logger.info(
+        "If you use these models, please cite the easymode preprint: So-Last et al. (2026), 'Easymode: general pretrained networks for cellular cryo-ET enable flexible approaches to subtomogram averaging', bioRxiv — https://www.biorxiv.org/content/10.64898/2026.05.19.726344v1",
+    )
+    logger.info("easymode docs: https://mgflast.github.io/easymode | repo: https://github.com/mgflast/easymode")
 
     # Validate config
     if not config:

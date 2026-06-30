@@ -4,11 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "copick-easymode"
-# Floor only: the thin CLI wrapper is pure-Python and imports its heavy deps
-# (easymode/TensorFlow) lazily, so it installs (e.g. `--no-deps` for CLI-docs
-# introspection) on any modern Python. A full install still needs an
-# easymode/TensorFlow-compatible interpreter.
-requires-python = ">=3.9"
+requires-python = ">=3.9,<3.12"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
@@ -16,11 +12,23 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     "click>=8.1.8",
-    "copick>=1.20.0",
-    "easymode @ git+https://github.com/mgflast/easymode.git",
+    "copick>=1.24.1",
     "numpy>=2.0.2",
     "scipy>=1.10.0",
-    "tensorflow>2.11.0",
+    "tensorflow>=2.16",
+    # easymode itself is installed separately from GitHub with `--no-deps` (see README): it is
+    # not on PyPI, and its published metadata wrongly pins numpy<2 / tensorflow<2.12, which
+    # conflicts with copick (numpy>=2). easymode runs fine on numpy>=2, so we install copick +
+    # numpy>=2 first and declare easymode's runtime deps here so the env is complete.
+    "mrcfile",
+    "huggingface_hub",
+    "requests",
+    "tifffile",
+    "psutil",
+    "starfile",
+    "lxml",
+    "tqdm",
+    "scikit-image",
 ]
 authors = [
     { name = "Utz H. Ermel", email = "utz@ermel.me" },

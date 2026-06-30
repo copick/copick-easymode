@@ -44,7 +44,10 @@ def list_available_models(online: bool = True) -> list[str]:
         try:
             from easymode.core.distribution import list_remote_models
 
-            return list_remote_models()
+            remote = list_remote_models()
+            # easymode >=1.0.0 returns a list of dicts ({"title", "dim", "has_3d", "has_2d"});
+            # older versions returned a list of model-name strings. Normalize to names either way.
+            return [m["title"] if isinstance(m, dict) else m for m in remote]
         except Exception:
             # Fall back to known models if online fetch fails
             return KNOWN_MODELS.copy()

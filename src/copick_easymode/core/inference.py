@@ -198,7 +198,7 @@ def run_easymode_inference(
             stats["errors"].append(error_msg)
             continue
 
-        model_apix = metadata.get("apix", 10.0)
+        model_apix = (metadata or {}).get("apix", 10.0)
 
         if logger:
             logger.info(f"Model loaded from {model_path}, inference at {model_apix} A/px")
