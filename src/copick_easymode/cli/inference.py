@@ -148,42 +148,49 @@ def easymode(
 
     This command runs inference using easymode's pretrained segmentation models
     on tomograms stored in a copick project and saves the results as copick
-    segmentations.
+    segmentations. Each requested feature is written back as its own single-label
+    segmentation at the input tomogram's voxel size; with ``--add-objects`` (on by
+    default) each feature is also registered as a pickable object in the config.
 
     Available models include: ribosome, membrane, microtubule, actin, cytoplasm,
     mitochondrion, nucleus, nuclear_envelope, npc, and more.
 
     \b
-    Acknowledgements:
-        This command uses the pretrained easymode models by Mart G. F. So-Last et al.
-        If you use these models in your research, please cite the easymode preprint:
-        So-Last, M. G. F., Hale, T., Burt, A., & Allegretti, M. (2026). "Easymode: general
-        pretrained networks for cellular cryo-ET enable flexible approaches to subtomogram
-        averaging." bioRxiv. https://www.biorxiv.org/content/10.64898/2026.05.19.726344v1
-        Docs: https://mgflast.github.io/easymode | Repo: https://github.com/mgflast/easymode
+    URI Format:
+        Tomograms:     type@voxel_spacing
+        Segmentations: name:user_id/session_id@voxel_spacing
 
     \b
     Examples:
+        # Segment ribosomes in all runs
+        copick inference easymode -c config.json -m ribosome -t wbp@10.0
+
+        # Segment multiple features
+        copick inference easymode -c config.json -m ribosome,membrane -t wbp@10.0
+
+        # Segment specific runs with GPU selection
+        copick inference easymode -c config.json -m membrane -t wbp@10.0 --run run001,run002 --gpus 0,1
+
+        # High quality inference with TTA
+        copick inference easymode -c config.json -m ribosome -t wbp@10.0 --tta 16 --batch-size 2
+
+        # Skip adding object definitions to config
+        copick inference easymode -c config.json -m ribosome -t wbp@10.0 --no-add-objects
 
     \b
-    # Segment ribosomes in all runs
-    copick inference easymode -c config.json -m ribosome -t wbp@10.0
+    See Also:
+        copick convert seg2mesh: turn an easymode segmentation into a surface mesh
 
     \b
-    # Segment multiple features
-    copick inference easymode -c config.json -m ribosome,membrane -t wbp@10.0
+    Notes:
+        A CUDA GPU is strongly recommended; the weights download automatically on first use.
 
     \b
-    # Segment specific runs with GPU selection
-    copick inference easymode -c config.json -m membrane -t wbp@10.0 --run run001,run002 --gpus 0,1
-
-    \b
-    # High quality inference with TTA
-    copick inference easymode -c config.json -m ribosome -t wbp@10.0 --tta 16 --batch-size 2
-
-    \b
-    # Skip adding object definitions to config
-    copick inference easymode -c config.json -m ribosome -t wbp@10.0 --no-add-objects
+    Acknowledgements:
+        This command uses pretrained models from easymode by Mart G.F. Last.
+        Docs: https://mgflast.github.io/easymode
+        Repo: https://github.com/mgflast/easymode
+        If you use these models in your research, please cite the easymode authors.
     """
     # Deferred imports for CLI performance
     import copick
