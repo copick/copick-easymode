@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.1.4...copick-easymode-v0.2.0) (2026-06-30)
+
+
+### Features
+
+* support easymode 1.0.0 and require latest copick ([#23](https://github.com/copick/copick-easymode/issues/23)) ([56b273f](https://github.com/copick/copick-easymode/commit/56b273f5dda3807c32e86863f6a8d1ad17dc96a0))
+
 ## [0.1.4](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.1.3...copick-easymode-v0.1.4) (2026-06-29)
 
 
