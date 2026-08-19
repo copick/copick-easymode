@@ -7,11 +7,13 @@ import json
 import os
 import platform
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import zarr
+from copick.util.escape import sanitize_name
 from copick.util.ome import get_level_path
 from ome_zarr_models.v05.image import Image
 
@@ -98,8 +100,11 @@ def run_smoke(args: argparse.Namespace) -> dict[str, Any]:
     if not tomograms:
         raise ValueError(f"Tomogram {tomo_type}@{voxel_size} was not found in run {args.run!r}")
     tomogram = tomograms[0]
-    if root.get_object(args.model) is None and not args.add_object:
-        raise ValueError(f"Object {args.model!r} is absent; add it to the config or pass --add-object")
+    entity_name = sanitize_name(args.model, suppress_warnings=True)
+    user_id = sanitize_name(args.user_id, suppress_warnings=True)
+    session_id = sanitize_name(args.session_id, suppress_warnings=True)
+    if root.get_object(entity_name) is None and not args.add_object:
+        raise ValueError(f"Object {entity_name!r} is absent; add it to the config or pass --add-object")
 
     if args.cpu_only:
         os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -113,6 +118,9 @@ def run_smoke(args: argparse.Namespace) -> dict[str, Any]:
     model = runtime.load_model(str(model_path))
 
     volume = tomogram.numpy()
+    input_shape = volume.shape
+    input_dtype = str(volume.dtype)
+    input_sha256 = sha256_array(volume)
     started = time.perf_counter()
     probabilities = segment_tomogram_from_array(
         model=model,
@@ -125,6 +133,9 @@ def run_smoke(args: argparse.Namespace) -> dict[str, Any]:
     inference_seconds = time.perf_counter() - started
     if probabilities.size == 0 or not np.isfinite(probabilities).all():
         raise ValueError("Real-model probability map must be nonempty and finite")
+    if not np.any(probabilities >= args.threshold):
+        raise ValueError("Real-model smoke would produce an empty segmentation")
+    del volume
 
     cached_runtime = EasymodeRuntime(
         tensorflow=runtime.tensorflow,
@@ -153,15 +164,18 @@ def run_smoke(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError(f"Smoke output was not saved successfully: {stats!r}")
 
     segmentation = run.get_segmentations(
-        name=args.model,
-        user_id=args.user_id,
-        session_id=args.session_id,
+        name=entity_name,
+        user_id=user_id,
+        session_id=session_id,
         voxel_size=voxel_size,
         is_multilabel=False,
     )[0]
     saved = segmentation.numpy()
     expected = (probabilities >= args.threshold).astype(np.uint8)
     np.testing.assert_array_equal(saved, expected)
+    foreground_voxels = int(np.count_nonzero(saved))
+    if foreground_voxels == 0:
+        raise ValueError("Real-model smoke produced an empty segmentation")
     output_group = zarr.open_group(segmentation.zarr(), mode="r")
     output_ome_zarr_version = Image.from_zarr(output_group).ome_zarr_version
     if output_group.metadata.zarr_format != 3 or output_ome_zarr_version != "0.5":
@@ -182,13 +196,14 @@ def run_smoke(args: argparse.Namespace) -> dict[str, Any]:
         for device in runtime.tensorflow.config.list_physical_devices()
     ]
     return {
+        "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "easymode_source_commit": EASYMODE_COMMIT,
         "packages": package_versions(),
         "python": platform.python_version(),
         "platform": platform.platform(),
         "devices": devices,
         "model": args.model,
-        "model_path": str(model_path),
+        "model_file": model_path.name,
         "model_sha256": sha256_file(model_path),
         "model_metadata": metadata,
         "huggingface_revision": discover_huggingface_revision(model_path),
@@ -196,9 +211,9 @@ def run_smoke(args: argparse.Namespace) -> dict[str, Any]:
         "backend": root.config.config_type,
         "input_zarr_format": input_zarr_format,
         "input_ome_zarr_version": input_ome_zarr_version,
-        "input_shape": volume.shape,
-        "input_dtype": str(volume.dtype),
-        "input_sha256": sha256_array(volume),
+        "input_shape": input_shape,
+        "input_dtype": input_dtype,
+        "input_sha256": input_sha256,
         "probability_shape": probabilities.shape,
         "probability_dtype": str(probabilities.dtype),
         "probability_min": float(probabilities.min()),
@@ -206,9 +221,10 @@ def run_smoke(args: argparse.Namespace) -> dict[str, Any]:
         "probability_sha256": sha256_array(probabilities),
         "inference_seconds": inference_seconds,
         "threshold": args.threshold,
-        "segmentation_path": segmentation.path,
+        "segmentation_entity": f"{entity_name}:{user_id}/{session_id}@{voxel_size}",
         "output_zarr_format": output_group.metadata.zarr_format,
         "output_ome_zarr_version": output_ome_zarr_version,
+        "foreground_voxels": foreground_voxels,
         "segmentation_sha256": sha256_array(saved),
         "stats": stats,
     }

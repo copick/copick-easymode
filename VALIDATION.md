@@ -6,7 +6,7 @@ distribution. It does not publish either artifact.
 
 ```bash
 uv sync --locked --extra test --extra dev
-uv run --no-sync pytest -q -p no:warnings tests
+uv run --no-sync pytest -q tests
 uv build
 uv run --no-sync python scripts/inspect_distribution.py dist
 ```
@@ -15,7 +15,7 @@ The tagged-runtime compatibility check uses the immutable source revision and by
 metadata:
 
 ```bash
-uv pip install --python .venv/bin/python --no-deps \
+uv pip install --no-deps \
   "easymode @ git+https://github.com/mgflast/easymode.git@a42377e0b887364050bf47c63700a3dd1c0fa0d0"
 uv run --no-sync python -c \
   "from copick_easymode.core.easymode_adapter import get_inference_functions; get_inference_functions()"
@@ -42,6 +42,12 @@ model metadata, model-file SHA-256, discoverable Hugging Face revision, elapsed 
 dedicated user/session or an isolated overlay; pass `--overwrite` only when replacing that exact smoke output is
 intended. Omit `--add-object` when the model already has a matching pickable-object definition; when supplied, the
 flag updates the referenced configuration.
+
+The generated JSON is safe to commit without manual redaction: it records the model filename and logical
+segmentation entity instead of absolute local paths, uses the installed package versions verbatim, and adds a UTC
+recording timestamp. The command rejects an all-background result and records the foreground voxel count, so choose
+a tomogram on which the selected model produces foreground at the requested threshold. Do not commit a manually
+edited or empty-output record; valid replacement evidence is pending until such a real-model run is available.
 
 The same command is the application-level handoff probe for filesystem, S3-compatible, SSH, and read-only
 ML Croissant/portal configurations. Remote/read-only sources must have a writable overlay. Backend credentials and
