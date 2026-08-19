@@ -142,7 +142,7 @@ def run_easymode_inference(
     logger=None,
     *,
     runtime: Optional[easymode_adapter.EasymodeRuntime] = None,
-    segmenter=segment_tomogram_from_array,
+    segmenter=None,
 ) -> dict:
     """
     Run easymode inference on copick tomograms.
@@ -163,6 +163,10 @@ def run_easymode_inference(
         overwrite: Whether to overwrite existing segmentations.
         config_path: Path to save config if add_objects is True.
         logger: Logger instance for output messages.
+        runtime: Optional easymode runtime dependency. When supplied, the
+            function does not load the runtime or import TensorFlow itself.
+        segmenter: Optional callable that converts a tomogram array into a
+            probability map. Defaults to :func:`segment_tomogram_from_array`.
 
     Returns:
         Dictionary with processing statistics: processed, skipped, errors.
@@ -174,6 +178,8 @@ def run_easymode_inference(
         os.environ["CUDA_VISIBLE_DEVICES"] = gpus
 
     runtime = runtime or easymode_adapter.load_runtime()
+    if segmenter is None:
+        segmenter = segment_tomogram_from_array
     tf = runtime.tensorflow
 
     # Enable memory growth to avoid allocating all GPU memory at once
