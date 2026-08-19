@@ -120,10 +120,10 @@ You can edit the config file afterward to add additional metadata like `emdb_id`
 Segmentations are stored in the copick project at:
 
 ```
-{overlay_root}/ExperimentRuns/{run_name}/VoxelSpacing{voxel_size:.3f}/Segmentations/
+{overlay_root}/ExperimentRuns/{run_name}/Segmentations/
 ```
 
-Each segmentation is stored as a zarr array with OME-Zarr metadata.
+Each single-label segmentation is stored as a `uint8` OME-Zarr 0.5 / Zarr v3 array.
 
 ## Requirements
 

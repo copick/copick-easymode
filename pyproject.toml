@@ -50,7 +50,7 @@ Issues = "https://github.com/copick/copick-easymode/issues"
 
 [project.optional-dependencies]
 test = [
-    "ome-zarr-models>=0.1.0",
+    "ome-zarr-models>=1.6",
     "pytest>=8.0.0",
     "pytest-cov>=6.2.1",
     "zarr>=3.1.6,<4",
@@ -120,6 +120,10 @@ docstring-quotes = "double"
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+filterwarnings = [
+    'error:get_tomogram is deprecated, use get_tomograms instead.*:DeprecationWarning',
+    'error:Input .* contains invalid characters\. It has been sanitized to .*:UserWarning',
+]
 
 [tool.coverage.run]
 source_pkgs = ["copick_easymode", "tests"]
