@@ -21,11 +21,19 @@ concurrency:
 
 jobs:
   test-locked:
-    name: locked py${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: locked ${{ matrix.os }} py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        include:
+          - os: ubuntu-latest
+            python-version: "3.11"
+          - os: ubuntu-latest
+            python-version: "3.12"
+          - os: ubuntu-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.13"
 
     steps:
       - uses: actions/checkout@v7
@@ -117,7 +125,10 @@ jobs:
       - name: Verify tagged private inference boundary
         run: >
           uv run --no-sync python -c
-          "from copick_easymode.core.easymode_adapter import get_inference_functions;
+          "from copick_easymode.core.easymode_adapter import get_inference_functions, load_runtime;
           functions = get_inference_functions();
           assert callable(functions.pad_volume);
-          assert callable(functions.segment_tomogram_instance)"
+          assert callable(functions.segment_tomogram_instance);
+          runtime = load_runtime();
+          assert callable(runtime.get_model);
+          assert callable(runtime.load_model)"

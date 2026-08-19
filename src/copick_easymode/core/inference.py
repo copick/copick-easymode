@@ -247,12 +247,13 @@ def run_easymode_inference(
                     stats["skipped"] += 1
                     continue
 
-                tomo = vs.get_tomogram(tomo_type)
-                if tomo is None:
+                tomograms = vs.get_tomograms(tomo_type=tomo_type)
+                if not tomograms:
                     if logger:
                         logger.warning(f"Tomogram {tomo_type}@{voxel_size} not found in {run.name}")
                     stats["skipped"] += 1
                     continue
+                tomo = tomograms[0]
             except Exception as e:
                 error_msg = f"Error getting tomogram in {run.name}: {e}"
                 if logger:
