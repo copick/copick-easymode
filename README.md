@@ -32,8 +32,12 @@ Verify the install:
 
 ```bash
 python -c "import numpy, easymode, importlib.metadata as m; print('numpy', numpy.__version__, '| easymode', m.version('easymode'))"
-# expected: numpy 2.x | easymode 1.0.0
+# expected: NumPy 2.x. The audited tag currently exposes legacy distribution
+# metadata version 0.0.5 even though its Git tag is easymode-1.0.0.
 ```
+
+See [VALIDATION.md](VALIDATION.md) for deterministic tests and the opt-in,
+checksum-recorded real-model/backend smoke. Model weights are never downloaded by normal pull-request tests.
 
 ## Usage
 

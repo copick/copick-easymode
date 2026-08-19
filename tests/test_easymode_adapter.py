@@ -1,5 +1,6 @@
 """Tests for the immutable easymode compatibility boundary."""
 
+import builtins
 import sys
 from types import ModuleType, SimpleNamespace
 
@@ -42,9 +43,16 @@ def test_model_listing_falls_back_when_distribution_is_unavailable(monkeypatch):
 
 
 def test_missing_inference_api_has_exact_install_guidance(monkeypatch):
-    monkeypatch.delitem(sys.modules, "easymode", raising=False)
-    monkeypatch.delitem(sys.modules, "easymode.segmentation", raising=False)
-    monkeypatch.delitem(sys.modules, "easymode.segmentation.inference", raising=False)
+    for module_name in [name for name in sys.modules if name == "easymode" or name.startswith("easymode.")]:
+        monkeypatch.delitem(sys.modules, module_name)
+    original_import = builtins.__import__
+
+    def reject_easymode(name, *args, **kwargs):
+        if name == "easymode" or name.startswith("easymode."):
+            raise ImportError("easymode is not installed")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", reject_easymode)
 
     with pytest.raises(easymode_adapter.EasymodeCompatibilityError) as exc_info:
         easymode_adapter.get_inference_functions()
