@@ -4,18 +4,24 @@ build-backend = "hatchling.build"
 
 [project]
 name = "copick-easymode"
-requires-python = ">=3.9,<3.12"
+requires-python = ">=3.11,<3.14"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
 ]
 dynamic = ["version"]
 dependencies = [
     "click>=8.1.8",
-    "copick>=1.24.1",
+    "copick>=2.0.0a1,<3",
     "numpy>=2.0.2",
     "scipy>=1.10.0",
-    "tensorflow>=2.16",
+    "tensorflow>=2.20,<3",
     # easymode itself is installed separately from GitHub with `--no-deps` (see README): it is
     # not on PyPI, and its published metadata wrongly pins numpy<2 / tensorflow<2.12, which
     # conflicts with copick (numpy>=2). easymode runs fine on numpy>=2, so we install copick +
@@ -45,10 +51,13 @@ Issues = "https://github.com/copick/copick-easymode/issues"
 [project.optional-dependencies]
 test = [
     "pytest>=8.0.0",
-    "pytest-cov>=4.0.0",
+    "pytest-cov>=6.2.1",
 ]
 dev = [
     "black>=25.1.0",
+    "hatchling>=1.25.0",
+    "hatch-vcs>=0.4.0",
+    "pre-commit>=4.2.0",
     "ruff>=0.12.0",
 ]
 
@@ -63,7 +72,7 @@ allow-direct-references = true
 
 [tool.black]
 line-length = 120
-target_version = ['py311']
+target_version = ['py311', 'py312', 'py313']
 
 [tool.ruff]
 line-length = 120
@@ -107,5 +116,19 @@ known-first-party = ["copick_easymode"]
 docstring-quotes = "double"
 
 [tool.pytest.ini_options]
-minversion = "6.0"
+minversion = "8.0"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source_pkgs = ["copick_easymode", "tests"]
+branch = true
+
+[tool.coverage.paths]
+copick_easymode = ["src/copick_easymode", "*/copick-easymode/src/copick_easymode"]
+tests = ["tests", "*/copick-easymode/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "no cov",
+    "if TYPE_CHECKING:",
+]

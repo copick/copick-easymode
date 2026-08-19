@@ -237,6 +237,15 @@ def easymode(
     if tta < 1 or tta > 16:
         logger.critical(f"TTA must be between 1 and 16, got {tta}")
         ctx.fail(f"TTA must be between 1 and 16, got {tta}")
+    if batch_size < 1:
+        logger.critical(f"Batch size must be at least 1, got {batch_size}")
+        ctx.fail(f"Batch size must be at least 1, got {batch_size}")
+    if threshold < 0.0 or threshold > 1.0:
+        logger.critical(f"Threshold must be between 0.0 and 1.0, got {threshold}")
+        ctx.fail(f"Threshold must be between 0.0 and 1.0, got {threshold}")
+    if voxel_size <= 0:
+        logger.critical(f"Voxel size must be positive, got {voxel_size}")
+        ctx.fail(f"Voxel size must be positive, got {voxel_size}")
 
     # Load copick project
     try:
