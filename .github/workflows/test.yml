@@ -1,0 +1,123 @@
+name: Tests
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Exact commit to validate
+        required: false
+        type: string
+  push:
+    branches: [main, v2.0]
+    paths-ignore:
+      - "*.md"
+      - "LICENSE"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-locked:
+    name: locked py${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          version: "0.12.4"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Check lockfile
+        run: uv lock --check
+
+      - name: Install test environment
+        run: uv sync --locked --extra test --extra dev
+
+      - name: Verify Python version
+        run: >
+          uv run --no-sync python -c
+          "import sys; v = sys.version_info;
+          expected = tuple(map(int, '${{ matrix.python-version }}'.split('.')));
+          assert (v.major, v.minor) == expected, sys.version;
+          assert v.releaselevel == 'final', sys.version;
+          print(sys.version)"
+
+      - name: Require nonzero test collection
+        run: uv run --no-sync pytest --collect-only -q tests
+
+      - name: Run tests
+        run: uv run --no-sync pytest -q --cov --cov-branch --cov-report=term-missing tests
+
+  package:
+    name: package inspection
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          version: "0.12.4"
+          python-version: "3.11"
+
+      - name: Install inspection environment
+        run: uv sync --locked --extra test
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Inspect distributions
+        run: uv run --no-sync python scripts/inspect_distribution.py dist
+
+      - name: Test installed wheel
+        run: |
+          uv venv --clear .wheel-venv --python 3.11
+          uv pip install --python .wheel-venv/bin/python dist/*.whl
+          .wheel-venv/bin/python -c "from importlib.metadata import entry_points; eps = [ep for ep in entry_points(group='copick.inference.commands') if ep.name == 'easymode']; assert len(eps) == 1; eps[0].load()"
+          .wheel-venv/bin/copick inference easymode --help
+
+  tagged-easymode:
+    name: tagged easymode compatibility
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          version: "0.12.4"
+          python-version: "3.12"
+
+      - name: Install locked runtime
+        run: uv sync --locked --extra test
+
+      - name: Install immutable easymode source without its conflicting dependencies
+        run: >
+          uv pip install --python .venv/bin/python --no-deps
+          "easymode @ git+https://github.com/mgflast/easymode.git@a42377e0b887364050bf47c63700a3dd1c0fa0d0"
+
+      - name: Verify tagged private inference boundary
+        run: >
+          uv run --no-sync python -c
+          "from copick_easymode.core.easymode_adapter import get_inference_functions;
+          functions = get_inference_functions();
+          assert callable(functions.pad_volume);
+          assert callable(functions.segment_tomogram_instance)"

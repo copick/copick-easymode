@@ -10,23 +10,22 @@ If you use this plugin, please cite the easymode preprint (see [Citation](#citat
 
 ## Installation
 
-easymode 1.0.0 is not published to PyPI (only older `0.0.x` releases are), so it is installed
-from GitHub. Its packaging metadata also (incorrectly) pins `numpy<2` / `tensorflow<2.12`, which
-conflicts with copick's `numpy>=2` — even though easymode runs fine on `numpy>=2`. To avoid that
-conflict, install copick-easymode and its dependencies **first** (this brings in copick and
-`numpy>=2`), then install easymode from GitHub with `--no-deps` so its bad pins are ignored:
+The `v2.0` development line targets copick 2, OME-Zarr 0.5, and Zarr v3. It supports Python
+3.11-3.13 and reads legacy OME-Zarr 0.4 / Zarr v2 projects through copick's compatibility layer.
+
+easymode 1.0.0 is not published to PyPI, and its source metadata pins versions that conflict
+with copick's NumPy 2 stack. Install this repository and its dependencies first, then install the
+immutable easymode 1.0.0 source revision with `--no-deps`:
 
 ```bash
-git clone https://github.com/copick/copick-easymode.git
+git clone --branch v2.0 https://github.com/copick/copick-easymode.git
 cd copick-easymode
 
-# 1. Install copick-easymode + dependencies (copick, numpy>=2, tensorflow>=2.16, easymode's runtime deps)
+# 1. Install copick-easymode + dependencies (copick 2 alpha, NumPy 2, TensorFlow 2.20+).
 pip install -e .
 
-# 2. Install easymode from GitHub WITHOUT dependency resolution.
-#    --no-deps keeps your numpy>=2 stack intact, and also upgrades over any older easymode
-#    (e.g. a 0.0.x already installed from PyPI).
-pip install --no-deps git+https://github.com/mgflast/easymode.git
+# 2. Install the audited easymode-1.0.0 commit WITHOUT dependency resolution.
+pip install --no-deps "easymode @ git+https://github.com/mgflast/easymode.git@a42377e0b887364050bf47c63700a3dd1c0fa0d0"
 ```
 
 Verify the install:
@@ -124,11 +123,11 @@ Each segmentation is stored as a zarr array with OME-Zarr metadata.
 
 ## Requirements
 
-- Python >= 3.10, < 3.13
-- copick >= 1.24.1
+- Python >= 3.11, < 3.14
+- copick >= 2.0.0a1, < 3
 - numpy >= 2.0.2
-- TensorFlow >= 2.16
-- easymode (installed separately from GitHub — see [Installation](#installation))
+- TensorFlow >= 2.20, < 3
+- easymode 1.0.0 commit `a42377e0b887364050bf47c63700a3dd1c0fa0d0` (installed separately; see [Installation](#installation))
 
 ## Citation
 

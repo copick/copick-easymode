@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
+from copick_easymode.core import easymode_adapter
+
 if TYPE_CHECKING:
     from copick.models import CopickRoot
 
@@ -42,9 +44,9 @@ def segment_tomogram_from_array(
     Returns:
         Segmentation probability map as numpy array (float32, values 0-1).
     """
-    # Import easymode inference functions
-    from easymode.segmentation.inference import _pad_volume, _segment_tomogram_instance
     from scipy.ndimage import zoom
+
+    inference_functions = easymode_adapter.get_inference_functions()
 
     volume = volume.astype(np.float32)
     oj, ok, ol = volume.shape
@@ -63,7 +65,7 @@ def segment_tomogram_from_array(
     volume /= np.std(volume[:, _k_margin:-_k_margin, _l_margin:-_l_margin]) + 1e-7
 
     # Pad volume to be divisible by 32
-    volume, padding = _pad_volume(volume)
+    volume, padding = inference_functions.pad_volume(volume)
     segmented_volume = np.zeros_like(volume)
 
     # Adjust tile size based on volume shape
@@ -91,7 +93,13 @@ def segment_tomogram_from_array(
         tta_vol = tta_vol if not k_fx[j] else np.flip(tta_vol, axis=1)
         tta_vol = np.rot90(tta_vol, k=2 * k_yz[j], axes=(0, 1))
 
-        segmented_tta_vol = _segment_tomogram_instance(tta_vol, model, batch_size, tile_size, overlap)
+        segmented_tta_vol = inference_functions.segment_tomogram_instance(
+            tta_vol,
+            model,
+            batch_size,
+            tile_size,
+            overlap,
+        )
 
         segmented_tta_vol = np.rot90(segmented_tta_vol, k=-2 * k_yz[j], axes=(0, 1))
         segmented_tta_vol = segmented_tta_vol if not k_fx[j] else np.flip(segmented_tta_vol, axis=1)
@@ -132,6 +140,9 @@ def run_easymode_inference(
     overwrite: bool = False,
     config_path: Optional[str] = None,
     logger=None,
+    *,
+    runtime: Optional[easymode_adapter.EasymodeRuntime] = None,
+    segmenter=None,
 ) -> dict:
     """
     Run easymode inference on copick tomograms.
@@ -152,18 +163,24 @@ def run_easymode_inference(
         overwrite: Whether to overwrite existing segmentations.
         config_path: Path to save config if add_objects is True.
         logger: Logger instance for output messages.
+        runtime: Optional easymode runtime dependency. When supplied, the
+            function does not load the runtime or import TensorFlow itself.
+        segmenter: Optional callable that converts a tomogram array into a
+            probability map. Defaults to :func:`segment_tomogram_from_array`.
 
     Returns:
         Dictionary with processing statistics: processed, skipped, errors.
     """
-    import tensorflow as tf
-    from easymode.core.distribution import get_model, load_model
-
     stats = {"processed": 0, "skipped": 0, "errors": []}
 
     # Configure GPUs
     if gpus is not None:
         os.environ["CUDA_VISIBLE_DEVICES"] = gpus
+
+    runtime = runtime or easymode_adapter.load_runtime()
+    if segmenter is None:
+        segmenter = segment_tomogram_from_array
+    tf = runtime.tensorflow
 
     # Enable memory growth to avoid allocating all GPU memory at once
     for device in tf.config.list_physical_devices("GPU"):
@@ -190,7 +207,7 @@ def run_easymode_inference(
             logger.info(f"Loading model: {model_name}")
 
         # Get and load model
-        model_path, metadata = get_model(model_name)
+        model_path, metadata = runtime.get_model(model_name)
         if model_path is None:
             error_msg = f"Model '{model_name}' not found. Skipping."
             if logger:
@@ -203,7 +220,7 @@ def run_easymode_inference(
         if logger:
             logger.info(f"Model loaded from {model_path}, inference at {model_apix} A/px")
 
-        model = load_model(model_path)
+        model = runtime.load_model(model_path)
 
         # Add object definition if needed
         if add_objects:
@@ -270,7 +287,7 @@ def run_easymode_inference(
                 if logger:
                     logger.info(f"Running inference for {model_name} on {run.name}")
 
-                seg_data = segment_tomogram_from_array(
+                seg_data = segmenter(
                     model=model,
                     volume=tomo_data,
                     input_apix=voxel_size,
