@@ -50,8 +50,10 @@ Issues = "https://github.com/copick/copick-easymode/issues"
 
 [project.optional-dependencies]
 test = [
+    "ome-zarr-models>=1.6",
     "pytest>=8.0.0",
     "pytest-cov>=6.2.1",
+    "zarr>=3.1.6,<4",
 ]
 dev = [
     "black>=25.1.0",
