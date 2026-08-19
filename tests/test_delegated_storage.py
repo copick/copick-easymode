@@ -114,6 +114,14 @@ def _probabilities(volume: np.ndarray) -> np.ndarray:
     return np.resize(values, volume.shape)
 
 
+def _add_v3_run(fixture: _Fixture, name: str):
+    run = fixture.root.new_run(name)
+    voxel_spacing = run.new_voxel_spacing(10.0)
+    tomogram = voxel_spacing.new_tomogram("wbp")
+    tomogram.from_numpy(fixture.values, levels=1)
+    return run, tomogram
+
+
 @pytest.mark.parametrize(("zarr_format", "level_path"), [(2, "0"), (2, "s0"), (3, "0"), (3, "s0")])
 def test_equivalent_v2_v3_inputs_delegate_to_copick_and_write_v3(tmp_path, zarr_format, level_path):
     fixture = _project(tmp_path, zarr_format, level_path)
@@ -160,6 +168,28 @@ def test_equivalent_v2_v3_inputs_delegate_to_copick_and_write_v3(tmp_path, zarr_
     assert group.metadata.zarr_format == 3
     assert Image.from_zarr(group).ome_zarr_version == "0.5"
     assert group[get_level_path(group, 0)].dtype == np.dtype(np.uint8)
+
+
+def test_default_segmenter_is_resolved_at_call_time(tmp_path, monkeypatch):
+    fixture = _project(tmp_path, 3, "s0")
+    runtime, _ = _runtime()
+    segmenter = Mock(side_effect=lambda **kwargs: _probabilities(kwargs["volume"]))
+    monkeypatch.setattr("copick_easymode.core.inference.segment_tomogram_from_array", segmenter)
+
+    stats = run_easymode_inference(
+        fixture.root,
+        [],
+        "wbp",
+        10.0,
+        ["ribosome"],
+        "tester",
+        "1",
+        add_objects=False,
+        runtime=runtime,
+    )
+
+    assert stats == {"processed": 1, "skipped": 0, "errors": []}
+    segmenter.assert_called_once()
 
 
 def _legacy_segmentation(fixture: _Fixture, values: np.ndarray):
@@ -244,6 +274,11 @@ def test_overwrite_reuses_entity_and_replaces_legacy_store_with_v3(tmp_path):
     group = zarr.open_group(segmentations[0].zarr(), mode="r")
     assert group.metadata.zarr_format == 3
     assert Image.from_zarr(group).ome_zarr_version == "0.5"
+    assert "legacy" not in group
+    output_keys = _snapshot(segmentations[0].path)
+    assert ".zgroup" not in output_keys
+    assert ".zattrs" not in output_keys
+    assert not any(key == "legacy" or key.startswith("legacy/") for key in output_keys)
 
 
 def test_failed_inference_preserves_existing_segmentation(tmp_path):
@@ -276,11 +311,48 @@ def test_failed_inference_preserves_existing_segmentation(tmp_path):
     assert tensorflow.keras.backend.clear_count == 1
 
 
+def test_failed_inference_preserves_existing_v3_segmentation(tmp_path):
+    fixture = _project(tmp_path, 3, "s0")
+    expected = np.ones(fixture.values.shape, dtype=np.uint8)
+    existing = fixture.run.new_segmentation(
+        name="ribosome",
+        voxel_size=10.0,
+        user_id="tester",
+        session_id="1",
+        is_multilabel=False,
+    )
+    existing.from_numpy(expected)
+    before = _snapshot(existing.path)
+    runtime, tensorflow = _runtime()
+
+    stats = run_easymode_inference(
+        fixture.root,
+        [],
+        "wbp",
+        10.0,
+        ["ribosome"],
+        "tester",
+        "1",
+        overwrite=True,
+        add_objects=False,
+        runtime=runtime,
+        segmenter=Mock(side_effect=RuntimeError("inference failed")),
+    )
+
+    assert stats["processed"] == 0
+    assert stats["skipped"] == 0
+    assert len(stats["errors"]) == 1
+    assert "inference failed" in stats["errors"][0]
+    assert _snapshot(existing.path) == before
+    np.testing.assert_array_equal(existing.numpy(), expected)
+    assert tensorflow.keras.backend.clear_count == 1
+
+
 def test_missing_model_records_error_cleans_runtime_and_continues(tmp_path):
     fixture = _project(tmp_path, 3, "s0")
     fixture.root.new_run("missing-input")
     tensorflow = _TensorFlow()
-    get_model = Mock(side_effect=[(None, None), ("model.keras", {"apix": 10.0})])
+    get_model = Mock(side_effect=[("model.keras", {"apix": 10.0}), (None, None)])
     runtime = EasymodeRuntime(tensorflow, get_model, lambda path: object())
 
     stats = run_easymode_inference(
@@ -288,7 +360,7 @@ def test_missing_model_records_error_cleans_runtime_and_continues(tmp_path):
         [],
         "wbp",
         10.0,
-        ["missing", "ribosome"],
+        ["ribosome", "missing"],
         "tester",
         "1",
         add_objects=False,
@@ -301,6 +373,154 @@ def test_missing_model_records_error_cleans_runtime_and_continues(tmp_path):
     assert len(stats["errors"]) == 1
     assert "missing" in stats["errors"][0]
     assert tensorflow.keras.backend.clear_count == 2
+
+
+def test_missing_tomogram_type_skips_without_inference(tmp_path):
+    fixture = _project(tmp_path, 3, "s0")
+    runtime, _ = _runtime()
+    segmenter = Mock(side_effect=AssertionError("inference must not run"))
+
+    stats = run_easymode_inference(
+        fixture.root,
+        [],
+        "sirt",
+        10.0,
+        ["ribosome"],
+        "tester",
+        "1",
+        add_objects=False,
+        runtime=runtime,
+        segmenter=segmenter,
+    )
+
+    assert stats == {"processed": 0, "skipped": 1, "errors": []}
+    segmenter.assert_not_called()
+
+
+def test_processing_failure_does_not_prevent_later_run(tmp_path, monkeypatch):
+    fixture = _project(tmp_path, 3, "s0")
+    successful_run, _ = _add_v3_run(fixture, "run-2")
+    monkeypatch.setattr(fixture.tomogram, "numpy", Mock(side_effect=RuntimeError("read failed")))
+    runtime, tensorflow = _runtime()
+
+    stats = run_easymode_inference(
+        fixture.root,
+        [],
+        "wbp",
+        10.0,
+        ["ribosome"],
+        "tester",
+        "1",
+        add_objects=False,
+        runtime=runtime,
+        segmenter=lambda **kwargs: np.ones(kwargs["volume"].shape, dtype=np.float32),
+    )
+
+    assert stats["processed"] == 1
+    assert stats["skipped"] == 0
+    assert len(stats["errors"]) == 1
+    assert "read failed" in stats["errors"][0]
+    assert len(successful_run.get_segmentations(name="ribosome")) == 1
+    assert tensorflow.keras.backend.clear_count == 1
+
+
+def test_sanitized_identifiers_skip_existing_output_before_inference(tmp_path, monkeypatch):
+    fixture = _project(tmp_path, 3, "s0")
+    existing = fixture.run.new_segmentation(
+        name="ribosome",
+        voxel_size=10.0,
+        user_id="my-user",
+        session_id="session-one",
+        is_multilabel=False,
+    )
+    existing.from_numpy(np.ones(fixture.values.shape, dtype=np.uint8))
+    monkeypatch.setattr(fixture.tomogram, "numpy", Mock(side_effect=AssertionError("tomogram must not be read")))
+    runtime, _ = _runtime()
+    segmenter = Mock(side_effect=AssertionError("inference must not run"))
+
+    stats = run_easymode_inference(
+        fixture.root,
+        [],
+        "wbp",
+        10.0,
+        ["ribosome"],
+        "my_user",
+        "session_one",
+        add_objects=False,
+        runtime=runtime,
+        segmenter=segmenter,
+    )
+
+    assert stats == {"processed": 0, "skipped": 1, "errors": []}
+    segmenter.assert_not_called()
+
+
+def test_model_name_is_raw_for_easymode_and_sanitized_for_copick(tmp_path, monkeypatch):
+    fixture = _project(tmp_path, 3, "s0")
+    get_model = Mock(return_value=("model.keras", {"apix": 10.0}))
+    tensorflow = _TensorFlow()
+    runtime = EasymodeRuntime(tensorflow, get_model, lambda path: object())
+    save_config = Mock()
+    monkeypatch.setattr(fixture.root, "save_config", save_config)
+
+    stats = run_easymode_inference(
+        fixture.root,
+        [],
+        "wbp",
+        10.0,
+        ["nuclear_envelope"],
+        "tester",
+        "1",
+        config_path="config.json",
+        runtime=runtime,
+        segmenter=lambda **kwargs: np.ones(kwargs["volume"].shape, dtype=np.float32),
+    )
+
+    assert stats == {"processed": 1, "skipped": 0, "errors": []}
+    get_model.assert_called_once_with("nuclear_envelope")
+    assert fixture.root.get_object("nuclear-envelope") is not None
+    segmentations = fixture.run.get_segmentations(name="nuclear-envelope", user_id="tester", session_id="1")
+    assert len(segmentations) == 1
+    save_config.assert_called_once_with("config.json")
+    assert tensorflow.keras.backend.clear_count == 1
+
+
+def test_object_creation_failure_records_error_and_continues(tmp_path, monkeypatch):
+    fixture = _project(tmp_path, 3, "s0")
+    original_new_object = fixture.root.new_object
+
+    def create_object(**kwargs):
+        if kwargs["name"] == "actin":
+            raise RuntimeError("config is read-only")
+        return original_new_object(**kwargs)
+
+    new_object = Mock(side_effect=create_object)
+    save_config = Mock()
+    monkeypatch.setattr(fixture.root, "new_object", new_object)
+    monkeypatch.setattr(fixture.root, "save_config", save_config)
+    runtime, tensorflow = _runtime()
+
+    stats = run_easymode_inference(
+        fixture.root,
+        [],
+        "wbp",
+        10.0,
+        ["membrane", "actin", "ribosome"],
+        "tester",
+        "1",
+        config_path="config.json",
+        runtime=runtime,
+        segmenter=lambda **kwargs: np.ones(kwargs["volume"].shape, dtype=np.float32),
+    )
+
+    assert stats["processed"] == 2
+    assert stats["skipped"] == 0
+    assert len(stats["errors"]) == 1
+    assert "config is read-only" in stats["errors"][0]
+    assert [call.kwargs["name"] for call in new_object.call_args_list] == ["membrane", "actin"]
+    assert fixture.root.get_object("membrane") is not None
+    save_config.assert_called_once_with("config.json")
+    assert tensorflow.keras.backend.clear_count == 3
 
 
 def test_new_object_is_saved_once_and_existing_object_does_not_rewrite_config(tmp_path, monkeypatch):
