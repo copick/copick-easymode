@@ -200,21 +200,25 @@ def run_easymode_inference(
         if logger:
             logger.info(f"Loading model: {model_name}")
 
-        # Get and load model
-        model_path, metadata = runtime.get_model(model_name)
-        if model_path is None:
-            error_msg = f"Model '{model_name}' not found. Skipping."
+        # Get and load model. Model failures do not prevent later models from running.
+        try:
+            model_path, metadata = runtime.get_model(model_name)
+            if model_path is None:
+                raise FileNotFoundError(f"Model '{model_name}' not found")
+            model = runtime.load_model(model_path)
+        except Exception as error:
+            error_msg = f"Error loading model '{model_name}': {error}. Skipping."
             if logger:
-                logger.error(error_msg)
+                logger.exception(error_msg)
             stats["errors"].append(error_msg)
+            tf.keras.backend.clear_session()
+            gc.collect()
             continue
 
         model_apix = (metadata or {}).get("apix", 10.0)
 
         if logger:
             logger.info(f"Model loaded from {model_path}, inference at {model_apix} A/px")
-
-        model = runtime.load_model(model_path)
 
         # Add object definition if needed
         if add_objects:
@@ -293,19 +297,15 @@ def run_easymode_inference(
                 # Binarize using threshold and convert to uint8 (0 or 1)
                 seg_data = (seg_data >= threshold).astype(np.uint8)
 
-                # Create or get segmentation
-                if existing_segs and overwrite:
-                    # Delete existing segmentation first
-                    for _existing_seg in existing_segs:
-                        # Note: copick doesn't have a delete method, so we overwrite via exist_ok
-                        pass
-
+                # Reuse a matching entity only after inference has completed. This lets a
+                # failed inference leave an existing segmentation untouched.
                 seg = run.new_segmentation(
                     name=model_name,
                     voxel_size=voxel_size,
                     user_id=user_id,
                     session_id=session_id,
                     is_multilabel=False,
+                    exist_ok=overwrite,
                 )
 
                 # Write segmentation
@@ -323,6 +323,7 @@ def run_easymode_inference(
                 stats["errors"].append(error_msg)
 
         # Clean up model to free GPU memory
+        del model
         tf.keras.backend.clear_session()
         gc.collect()
 
