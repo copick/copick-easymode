@@ -33,7 +33,7 @@ def add_easymode_inference_options(func: click.Command) -> click.Command:
             type=int,
             default=4,
             show_default=True,
-            help="Test-time augmentation level (1-16). Higher = better but slower.",
+            help="Test-time augmentation level (1-16; an .scnm model uses at most 8). Higher = better but slower.",
         ),
         click.option(
             "--batch-size",
