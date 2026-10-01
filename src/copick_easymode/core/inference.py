@@ -144,7 +144,7 @@ def run_easymode_inference(
         models: List of easymode model names to run.
         user_id: User ID for created segmentations.
         session_id: Session ID for created segmentations.
-        tta: Test-time augmentation level (1-16).
+        tta: Test-time augmentation level (1-16; an .scnm model uses at most 8).
         batch_size: Batch size for inference.
         threshold: Probability threshold for binarizing segmentation (0.0-1.0).
         gpus: Comma-separated GPU IDs (e.g., '0,1'). None for auto-detect.
@@ -158,6 +158,9 @@ def run_easymode_inference(
     """
     import tensorflow as tf
     from easymode.core.distribution import get_model, load_model
+
+    from copick_easymode.core.models import copick_name
+    from copick_easymode.core.scnm import MAX_TTA, is_scnm, load_scnm, segment_volume_scnm
 
     stats = {"processed": 0, "skipped": 0, "errors": []}
 
@@ -198,21 +201,39 @@ def run_easymode_inference(
             stats["errors"].append(error_msg)
             continue
 
-        model_apix = (metadata or {}).get("apix", 10.0)
+        # The copick name of this feature: copick turns the underscores easymode uses
+        # (atp_synthase, nuclear_envelope, ...) into dashes and refuses them in object names.
+        object_name = copick_name(model_name)
 
-        if logger:
-            logger.info(f"Model loaded from {model_path}, inference at {model_apix} A/px")
+        if is_scnm(model_path):
+            # An Ais 2D-engine model (most easymode features): its own metadata says how it runs.
+            scnm = load_scnm(model_path)
+            model, model_apix = None, scnm.apix
+            model_tta = min(tta, MAX_TTA)
+            if logger:
+                logger.info(
+                    f"Model loaded from {model_path}: {scnm.dimensionality}D {'slab' if scnm.is_slab else 'slice'}"
+                    f" model, inference at {model_apix} A/px",
+                )
+                if model_tta != tta:
+                    logger.info(f"TTA {tta} reduced to {model_tta}, the most an .scnm model supports")
+        else:
+            scnm, model_tta = None, tta
+            model_apix = (metadata or {}).get("apix", 10.0)
 
-        model = load_model(model_path)
+            if logger:
+                logger.info(f"Model loaded from {model_path}, inference at {model_apix} A/px")
+
+            model = load_model(model_path)
 
         # Add object definition if needed
         if add_objects:
-            existing_obj = root.get_object(model_name)
+            existing_obj = root.get_object(object_name)
             if existing_obj is None:
                 if logger:
-                    logger.info(f"Adding object definition for '{model_name}'")
+                    logger.info(f"Adding object definition for '{object_name}'")
                 root.new_object(
-                    name=model_name,
+                    name=object_name,
                     is_particle=False,  # Segmentation, not particle picks
                     # label and color will be auto-assigned
                 )
@@ -247,7 +268,7 @@ def run_easymode_inference(
 
             # Check if segmentation already exists
             existing_segs = run.get_segmentations(
-                name=model_name,
+                name=object_name,
                 user_id=user_id,
                 session_id=session_id,
                 voxel_size=voxel_size,
@@ -270,14 +291,17 @@ def run_easymode_inference(
                 if logger:
                     logger.info(f"Running inference for {model_name} on {run.name}")
 
-                seg_data = segment_tomogram_from_array(
-                    model=model,
-                    volume=tomo_data,
-                    input_apix=voxel_size,
-                    model_apix=model_apix,
-                    tta=tta,
-                    batch_size=batch_size,
-                )
+                if scnm is not None:
+                    seg_data = segment_volume_scnm(scnm, tomo_data, data_apix=voxel_size, tta=model_tta)
+                else:
+                    seg_data = segment_tomogram_from_array(
+                        model=model,
+                        volume=tomo_data,
+                        input_apix=voxel_size,
+                        model_apix=model_apix,
+                        tta=tta,
+                        batch_size=batch_size,
+                    )
 
                 # Binarize using threshold and convert to uint8 (0 or 1)
                 seg_data = (seg_data >= threshold).astype(np.uint8)
@@ -290,7 +314,7 @@ def run_easymode_inference(
                         pass
 
                 seg = run.new_segmentation(
-                    name=model_name,
+                    name=object_name,
                     voxel_size=voxel_size,
                     user_id=user_id,
                     session_id=session_id,
@@ -312,6 +336,7 @@ def run_easymode_inference(
                 stats["errors"].append(error_msg)
 
         # Clean up model to free GPU memory
+        model = scnm = None
         tf.keras.backend.clear_session()
         gc.collect()
 
