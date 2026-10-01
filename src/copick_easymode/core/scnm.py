@@ -312,6 +312,9 @@ def segment_volume_scnm(scnm: ScnmModel, volume: np.ndarray, data_apix: float, t
     seg = np.clip(seg / tta, 0.0, 1.0)
     if seg.shape != tuple(original_shape):
         seg = zoom(
-            seg, (1.0, original_shape[1] / seg.shape[1], original_shape[2] / seg.shape[2]), order=1, prefilter=False
+            seg,
+            (1.0, original_shape[1] / seg.shape[1], original_shape[2] / seg.shape[2]),
+            order=1,
+            prefilter=False,
         )
     return seg.astype(np.float32)
