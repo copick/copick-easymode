@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.0](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.2.0...copick-easymode-v0.3.0) (2026-10-01)
+
+
+### Features
+
+* run easymode's .scnm (Ais 2D-engine) models in-process ([#47](https://github.com/copick/copick-easymode/issues/47)) ([d5053c8](https://github.com/copick/copick-easymode/commit/d5053c8eab96d29662c751f71f8ddfb2f060fccd))
+
+
+### Bug Fixes
+
+* bump actions/setup-python from 6 to 7 ([#29](https://github.com/copick/copick-easymode/issues/29)) ([3f5948e](https://github.com/copick/copick-easymode/commit/3f5948e77ee00a4ce2e34aa651db3d3d7d9e8e0d))
+* bump chanzuckerberg/github-actions from 6.25.0 to 6.30.0 ([#26](https://github.com/copick/copick-easymode/issues/26)) ([9b0e159](https://github.com/copick/copick-easymode/commit/9b0e1597147f01b5fe75c5fe10594ed98bc47f60))
+* bump chanzuckerberg/github-actions from 6.30.0 to 6.41.1 ([#46](https://github.com/copick/copick-easymode/issues/46)) ([444fb7e](https://github.com/copick/copick-easymode/commit/444fb7e0da8b4c4df5887a512b74b3e13d935465))
+* bump chanzuckerberg/github-actions from 6.41.1 to 6.41.2 ([#48](https://github.com/copick/copick-easymode/issues/48)) ([addd874](https://github.com/copick/copick-easymode/commit/addd87415894ab167f253049fc7643526db9ed46))
+
 ## [0.2.0](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.1.4...copick-easymode-v0.2.0) (2026-06-30)
 
 
