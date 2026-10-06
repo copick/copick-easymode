@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.0.0-alpha.1](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.2.0...copick-easymode-v2.0.0-alpha.1) (2026-10-06)
+
+
+### Bug Fixes
+
+* bump chanzuckerberg/github-actions from 6.25.0 to 6.30.0 ([#26](https://github.com/copick/copick-easymode/issues/26)) ([9b0e159](https://github.com/copick/copick-easymode/commit/9b0e1597147f01b5fe75c5fe10594ed98bc47f60))
+* bump the version of prereleases in src/copick_easymode/__init__.py ([#49](https://github.com/copick/copick-easymode/issues/49)) ([55c2ff7](https://github.com/copick/copick-easymode/commit/55c2ff72f409d112fb451dccc2de251324e45a95))
+
+
+### Miscellaneous Chores
+
+* start the v2.0 line at 2.0.0-alpha.1 ([#51](https://github.com/copick/copick-easymode/issues/51)) ([cb5ed39](https://github.com/copick/copick-easymode/commit/cb5ed3977aa5e8f4abd715a4b63d9cef75cd4c4d))
+
+
+### Continuous Integration
+
+* configure v2 alpha releases ([d3607ad](https://github.com/copick/copick-easymode/commit/d3607add96ed9e0259410c048d5d59793aef7b64))
+
 ## [0.2.0](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.1.4...copick-easymode-v0.2.0) (2026-06-30)
 
 
