@@ -15,6 +15,7 @@
   "packages": {
     ".": {
       "package-name": "copick-easymode",
+      "extra-files": [{ "type": "generic", "path": "src/copick_easymode/__init__.py" }],
       "tag-prefix": "copick-easymode ",
       "release-type": "python",
       "versioning": "prerelease",
