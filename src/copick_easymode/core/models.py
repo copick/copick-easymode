@@ -54,9 +54,9 @@ def list_available_models(online: bool = True) -> list[str]:
     """
     if online:
         try:
-            from easymode.core.distribution import list_remote_models
+            from copick_easymode.core.easymode_env import import_easymode
 
-            remote = list_remote_models()
+            remote = import_easymode().list_remote_models()
             # easymode >=1.0.0 returns a list of dicts ({"title", "dim", "has_3d", "has_2d"});
             # older versions returned a list of model-name strings. Normalize to names either way.
             return [m["title"] if isinstance(m, dict) else m for m in remote]
@@ -77,9 +77,9 @@ def validate_model_name(name: str) -> bool:
         True if the model is available, False otherwise.
     """
     try:
-        from easymode.core.distribution import get_model
+        from copick_easymode.core.easymode_env import import_easymode
 
-        path, meta = get_model(name, silent=True)
+        path, meta = import_easymode().get_model(name, silent=True)
         return path is not None
     except Exception:
         return False
@@ -96,9 +96,9 @@ def get_model_info(name: str) -> Optional[dict]:
         Dictionary with model metadata (apix, timestamp) or None if not found.
     """
     try:
-        from easymode.core.distribution import get_model
+        from copick_easymode.core.easymode_env import import_easymode
 
-        path, meta = get_model(name, silent=True)
+        path, meta = import_easymode().get_model(name, silent=True)
         if path is not None:
             return meta
         return None
