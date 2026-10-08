@@ -81,7 +81,8 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("COPICK_EASYMODE_IMPORT_LOCK", str(tmp_path / "import.lock"))
     monkeypatch.delenv("COPICK_EASYMODE_MODEL_DIR", raising=False)
-    monkeypatch.delenv("SLURM_CPUS_PER_TASK", raising=False)
+    for var in ("SLURM_CPUS_PER_TASK", "SLURM_CPUS_ON_NODE"):
+        monkeypatch.delenv(var, raising=False)
     for var in ("CUDA_VISIBLE_DEVICES", "OMP_NUM_THREADS", "TF_NUM_INTRAOP_THREADS", "TF_NUM_INTEROP_THREADS"):
         monkeypatch.setenv(var, "")
         monkeypatch.delenv(var)

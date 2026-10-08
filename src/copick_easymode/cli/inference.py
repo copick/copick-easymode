@@ -11,7 +11,7 @@ from copick.cli.util import add_config_option, add_debug_option, add_user_sessio
 
 def add_easymode_inference_options(func: click.Command) -> click.Command:
     """
-    Add easymode inference options: --gpus, --tta, --batch-size, --threshold.
+    Add easymode inference options: --tta, --batch-size, --threshold.
 
     Args:
         func (click.Command): The Click command to which the options will be added.
@@ -20,13 +20,6 @@ def add_easymode_inference_options(func: click.Command) -> click.Command:
         click.Command: The Click command with the inference options added.
     """
     opts = [
-        click.option(
-            "--gpus",
-            required=False,
-            type=str,
-            default=None,
-            help="Comma-separated GPU IDs (e.g., '0,1'). Default: all available.",
-        ),
         click.option(
             "--tta",
             required=False,
@@ -54,6 +47,102 @@ def add_easymode_inference_options(func: click.Command) -> click.Command:
     ]
 
     for opt in opts:
+        func = opt(func)
+
+    return func
+
+
+def add_parallel_options(func: click.Command) -> click.Command:
+    """
+    Add device and worker options: --gpus, --cpu, --max-workers, --threads.
+
+    Args:
+        func (click.Command): The Click command to which the options will be added.
+
+    Returns:
+        click.Command: The Click command with the device options added.
+    """
+    opts = [
+        click.option(
+            "--gpus",
+            required=False,
+            type=str,
+            default=None,
+            help="Comma-separated GPUs to use, one worker process each: positions in CUDA_VISIBLE_DEVICES when it "
+            "is set (else nvidia-smi indices), or device UUIDs. A GPU outside the allocation is refused. "
+            "Default: every GPU this process may use.",
+        ),
+        click.option(
+            "--cpu",
+            is_flag=True,
+            default=False,
+            help="Run on the CPU, with one worker and no GPU.",
+        ),
+        click.option(
+            "--max-workers",
+            required=False,
+            type=click.IntRange(min=1),
+            default=None,
+            help="Use at most this many GPUs (worker processes). Default: one per GPU.",
+        ),
+        click.option(
+            "--threads",
+            required=False,
+            type=click.IntRange(min=1),
+            default=None,
+            help="CPU threads to divide among the workers. Default: the CPUs this process may run on, at most "
+            "SLURM_CPUS_ON_NODE.",
+        ),
+    ]
+
+    for opt in reversed(opts):  # listed in --help in this order
+        func = opt(func)
+
+    return func
+
+
+def add_model_report_options(func: click.Command) -> click.Command:
+    """
+    Add model directory and report options: --model-dir, --offline, --report.
+
+    Args:
+        func (click.Command): The Click command to which the options will be added.
+
+    Returns:
+        click.Command: The Click command with the model and report options added.
+    """
+    opts = [
+        click.option(
+            "--model-dir",
+            required=False,
+            type=click.Path(file_okay=False),
+            default=None,
+            envvar="COPICK_EASYMODE_MODEL_DIR",
+            show_envvar=True,
+            help="easymode model directory (the one holding registry.json and models/). Default: easymode's "
+            "MODEL_DIRECTORY setting. Applies to this command only; easymode's settings file is not changed.",
+        ),
+        click.option(
+            "--offline",
+            is_flag=True,
+            default=False,
+            envvar="COPICK_EASYMODE_OFFLINE",
+            show_envvar=True,
+            help="Never contact the model registry: use only the weights already in the model directory, and "
+            "write nothing there.",
+        ),
+        click.option(
+            "--report",
+            "report_path",
+            required=False,
+            type=click.Path(dir_okay=False),
+            default=None,
+            help="Write a JSON report: settings, resolved models, devices, each worker's runs and outcome, "
+            "errors and timings.",
+        ),
+    ]
+
+    for opt in reversed(opts):  # listed in --help in this order
         func = opt(func)
 
     return func
@@ -123,6 +212,8 @@ def add_object_overwrite_options(func: click.Command) -> click.Command:
     help="Run name or comma-separated list of runs. Empty = all runs.",
 )
 @add_easymode_inference_options
+@add_parallel_options
+@add_model_report_options
 @add_user_session_options
 @add_object_overwrite_options
 @add_debug_option
@@ -133,10 +224,16 @@ def easymode(
     models: str,
     tomogram: str,
     run: str,
-    gpus: str,
     tta: int,
     batch_size: int,
     threshold: float,
+    gpus: str,
+    cpu: bool,
+    max_workers: int,
+    threads: int,
+    model_dir: str,
+    offline: bool,
+    report_path: str,
     user_id: str,
     session_id: str,
     add_objects: bool,
@@ -152,6 +249,10 @@ def easymode(
     segmentation at the input tomogram's voxel size; with ``--add-objects`` (on by
     default) each feature is also registered as a pickable object in the config.
 
+    One worker process runs per GPU, and the runs are split among them. Each worker
+    reads and preprocesses the next tomogram and writes the previous segmentation
+    while its GPU segments the current one.
+
     Available models include: ribosome, membrane, microtubule, actin, cytoplasm,
     mitochondrion, nucleus, nuclear_envelope, npc, and more.
 
@@ -162,13 +263,13 @@ def easymode(
 
     \b
     Examples:
-        # Segment ribosomes in all runs
+        # Segment ribosomes in all runs, on every GPU of the allocation
         copick inference easymode -c config.json -m ribosome -t wbp@10.0
 
         # Segment multiple features
         copick inference easymode -c config.json -m ribosome,membrane -t wbp@10.0
 
-        # Segment specific runs with GPU selection
+        # Segment specific runs on GPUs 0 and 1 (one worker process each)
         copick inference easymode -c config.json -m membrane -t wbp@10.0 --run run001,run002 --gpus 0,1
 
         # High quality inference with TTA
@@ -177,6 +278,9 @@ def easymode(
         # Skip adding object definitions to config
         copick inference easymode -c config.json -m ribosome -t wbp@10.0 --no-add-objects
 
+        # A shared model directory, no downloads, and a JSON report
+        copick inference easymode -c config.json -m actin -t wbp@10.0 --model-dir /shared/easymode --offline --report easymode.json
+
     \b
     See Also:
         copick convert seg2mesh: turn an easymode segmentation into a surface mesh
@@ -184,6 +288,7 @@ def easymode(
     \b
     Notes:
         A CUDA GPU is strongly recommended; the weights download automatically on first use.
+        The exit status is non-zero when a model is missing, a run fails or a worker dies.
 
     \b
     Acknowledgements:
@@ -193,10 +298,9 @@ def easymode(
         If you use these models in your research, please cite the easymode authors.
     """
     # Deferred imports for CLI performance
-    import copick
     from copick.util.log import get_logger
 
-    from copick_easymode.core.inference import run_easymode_inference
+    from copick_easymode.core.dispatch import dispatch_easymode_inference
 
     logger = get_logger(__name__, debug=debug)
 
@@ -238,50 +342,52 @@ def easymode(
         logger.critical(f"TTA must be between 1 and 16, got {tta}")
         ctx.fail(f"TTA must be between 1 and 16, got {tta}")
 
-    # Load copick project
-    try:
-        logger.info(f"Loading copick project from {config}")
-        root = copick.from_file(config)
-    except Exception as e:
-        logger.critical(f"Failed to load copick config: {e}")
-        ctx.fail(f"Failed to load copick config: {e}")
+    if cpu and gpus:
+        ctx.fail("--cpu and --gpus exclude each other.")
 
     logger.info(f"Models: {model_list}")
     logger.info(f"Tomogram: {tomo_type}@{voxel_size}")
     logger.info(f"Runs: {run_list if run_list else 'all'}")
     logger.info(f"TTA: {tta}, Batch size: {batch_size}, Threshold: {threshold}")
-    logger.info(f"GPUs: {gpus if gpus else 'auto'}")
+    logger.info(f"GPUs: {'none (--cpu)' if cpu else gpus if gpus else 'all of the allocation'}")
     logger.info(f"Add objects: {add_objects}, Overwrite: {overwrite}")
 
     # Run inference
-    try:
-        stats = run_easymode_inference(
-            root=root,
-            run_names=run_list,
-            tomo_type=tomo_type,
-            voxel_size=voxel_size,
-            models=model_list,
-            user_id=user_id,
-            session_id=session_id,
-            tta=tta,
-            batch_size=batch_size,
-            threshold=threshold,
-            gpus=gpus,
-            add_objects=add_objects,
-            overwrite=overwrite,
-            config_path=config if add_objects else None,
-            logger=logger,
-        )
-    except Exception as e:
-        logger.critical(f"Inference failed: {e}")
-        ctx.fail(f"Inference failed: {e}")
+    report = dispatch_easymode_inference(
+        config_path=config,
+        run_names=run_list,
+        tomo_type=tomo_type,
+        voxel_size=voxel_size,
+        models=model_list,
+        user_id=user_id,
+        session_id=session_id,
+        tta=tta,
+        batch_size=batch_size,
+        threshold=threshold,
+        overwrite=overwrite,
+        gpus=gpus,
+        cpu=cpu,
+        max_workers=max_workers,
+        threads=threads,
+        model_dir=model_dir,
+        offline=offline,
+        add_objects=add_objects,
+        report_path=report_path,
+        debug=debug,
+        logger=logger,
+    )
 
     # Report results
-    logger.info(f"Inference completed: {stats['processed']} processed, {stats['skipped']} skipped")
-    if stats["errors"]:
-        logger.warning(f"Errors encountered: {len(stats['errors'])}")
-        for error in stats["errors"]:
+    logger.info(f"Inference completed: {report['processed']} processed, {report['skipped']} skipped")
+    if report["errors"]:
+        logger.warning(f"Errors encountered: {len(report['errors'])}")
+        for error in report["errors"]:
             logger.warning(f"  - {error}")
 
-    if stats["processed"] == 0 and stats["skipped"] == 0:
+    if report["processed"] == 0 and report["skipped"] == 0 and not report["errors"]:
         logger.warning("No tomograms were processed. Check run names and tomogram URIs.")
+
+    if report_path:
+        logger.info(f"Report written to {report_path}")
+    if report["status"] != "complete":
+        ctx.exit(1)
