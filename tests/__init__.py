@@ -1,0 +1,1 @@
+"""copick-easymode behavior tests."""
