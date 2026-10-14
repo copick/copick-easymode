@@ -428,17 +428,16 @@ def dispatch_easymode_inference(
             log.warning("No runs found to process.")
             return report
 
-        from copick_easymode.core.easymode_env import resolve_models
+        from copick_easymode.core.easymode_env import easymode_version, resolve_models
 
         resolution = resolve_models(models, model_dir=model_dir, offline=offline, logger=log)
-        config_module = sys.modules.get("easymode.core.config")
         report.update(
             model_directory=resolution.model_directory,
             online=resolution.online,
             writable=resolution.writable,
             models=[m.to_dict() for m in resolution.models],
             missing=dict(resolution.missing),
-            easymode_version=getattr(config_module, "version", None),
+            easymode_version=easymode_version(),
         )
         for m in resolution.models:
             size = f"{m.bytes / 1e6:.0f} MB" if m.bytes is not None else "size unknown"

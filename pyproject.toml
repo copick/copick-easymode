@@ -109,3 +109,6 @@ docstring-quotes = "double"
 [tool.pytest.ini_options]
 minversion = "6.0"
 testpaths = ["tests"]
+filterwarnings = [
+    'error:Input .* contains invalid characters\. It has been sanitized to .*:UserWarning',
+]

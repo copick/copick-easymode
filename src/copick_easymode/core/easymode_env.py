@@ -1,5 +1,13 @@
 """
-easymode's configuration, imported safely by concurrent processes, and its models resolved once.
+The one place easymode is imported: its configuration, imported safely by concurrent processes, its models
+resolved once, and the private inference functions this package runs.
+
+**The compatibility boundary.** easymode is not on PyPI, and copick-easymode uses parts of it that are not a
+public API: the registry-based model distribution (``MODEL_CACHE_DIR``, ``REGISTRY_CACHE``, the ``_online``
+flag) and the private ``_pad_volume`` and ``_segment_tomogram_instance`` of ``easymode.segmentation.inference``.
+No other module imports easymode. What is used is checked when it is imported, and a missing or incompatible
+easymode raises :class:`EasymodeCompatibilityError`, which names the supported release and the command that
+installs it (:data:`EASYMODE_INSTALL`).
 
 **The import race.** ``easymode/core/config.py`` runs ``parse_settings()`` at import, and that function
 *rewrites* ``~/easymode/settings.txt`` (opening for writing truncates it, then the JSON is dumped). Processes
@@ -30,12 +38,24 @@ import sys
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence
 
 try:
     import fcntl
 except ImportError:  # pragma: no cover - not POSIX: no cross-process lock
     fcntl = None
+
+#: The easymode release this package is tested against, and its source commit (easymode is not on PyPI).
+EASYMODE_VERSION = "1.2.5"
+EASYMODE_COMMIT = "544572cfc071869113eb0567ef607791946a81c1"
+#: easymode's own metadata pins numpy<2 and tensorflow<2.12, so it is installed without its dependencies.
+EASYMODE_INSTALL = (
+    f"python -m pip install --no-deps 'easymode @ git+https://github.com/mgflast/easymode.git@{EASYMODE_COMMIT}'"
+)
+#: What this package reads from ``easymode.core.distribution``: the registry-based model cache ...
+_DISTRIBUTION_ATTRIBUTES = ("MODEL_CACHE_DIR", "REGISTRY_CACHE", "_online")
+#: ... and the functions it calls.
+_DISTRIBUTION_FUNCTIONS = ("get_model", "load_model", "list_remote_models", "is_online")
 
 ENV_MODEL_DIR = "COPICK_EASYMODE_MODEL_DIR"
 ENV_IMPORT_LOCK = "COPICK_EASYMODE_IMPORT_LOCK"
@@ -44,6 +64,29 @@ IMPORT_LOCK_NAME = ".copick-easymode-import.lock"
 FETCH_LOCK_NAME = ".copick-easymode-fetch.lock"
 IMPORT_LOCK_TIMEOUT = 900.0
 FETCH_LOCK_TIMEOUT = 3600.0
+
+
+class EasymodeCompatibilityError(RuntimeError):
+    """easymode is missing, or lacks the parts of it this package uses."""
+
+
+def _compatibility_error(detail: str) -> EasymodeCompatibilityError:
+    return EasymodeCompatibilityError(
+        f"The supported easymode runtime (easymode {EASYMODE_VERSION}) is missing or incompatible ({detail}). "
+        f"Install it with: {EASYMODE_INSTALL}",
+    )
+
+
+def _check_distribution(distribution):
+    """``distribution`` if it has what this package uses, else :class:`EasymodeCompatibilityError`."""
+    missing = [name for name in _DISTRIBUTION_ATTRIBUTES if not hasattr(distribution, name)]
+    missing += [name for name in _DISTRIBUTION_FUNCTIONS if not callable(getattr(distribution, name, None))]
+    if missing:
+        raise _compatibility_error(
+            f"easymode.core.distribution lacks {', '.join(missing)}; this package needs the registry-based "
+            "model distribution of easymode 1.x",
+        )
+    return distribution
 
 
 def _log(logger, level: str, message: str) -> None:
@@ -117,6 +160,13 @@ def _normalized(model_dir) -> Optional[str]:
     return os.path.abspath(os.path.expanduser(str(model_dir))) if model_dir else None
 
 
+def _import(name: str):
+    try:
+        return importlib.import_module(name)
+    except ImportError as exc:
+        raise _compatibility_error(f"{type(exc).__name__}: {exc}") from exc
+
+
 def import_easymode(model_dir=None, *, lock_path=None, logger=None, attempts: int = 5, pause: float = 0.3):
     """Import ``easymode.core.config`` and ``easymode.core.distribution`` safely; returns ``distribution``.
 
@@ -127,16 +177,17 @@ def import_easymode(model_dir=None, *, lock_path=None, logger=None, attempts: in
         logger: Receives what happened, if given.
         attempts: How often a settings object broken by a foreign writer is reloaded before giving up.
         pause: Seconds between those reloads.
+
+    Raises:
+        EasymodeCompatibilityError: easymode is not installed, or its distribution lacks what this package uses.
     """
     model_dir = _normalized(model_dir)
     config = sys.modules.get("easymode.core.config")
     distribution = sys.modules.get("easymode.core.distribution")
-    if (
-        distribution is not None
-        and _settings_ok(config)
-        and (model_dir is None or _same_dir(distribution.MODEL_CACHE_DIR, model_dir))
-    ):
-        return distribution
+    if distribution is not None and _settings_ok(config):
+        _check_distribution(distribution)
+        if model_dir is None or _same_dir(distribution.MODEL_CACHE_DIR, model_dir):
+            return distribution
 
     with file_lock(lock_path or default_lock_path(), IMPORT_LOCK_TIMEOUT, logger):
         if model_dir:
@@ -144,20 +195,21 @@ def import_easymode(model_dir=None, *, lock_path=None, logger=None, attempts: in
                 os.makedirs(model_dir, exist_ok=True)
             except OSError as exc:  # a read-only directory must already hold the models; resolution says if not
                 _log(logger, "warning", f"Cannot create the model directory {model_dir}: {exc}")
-        config = importlib.import_module("easymode.core.config")
+        config = _import("easymode.core.config")
         for attempt in range(1, attempts + 1):
             if _settings_ok(config):
                 if model_dir:
                     config.settings["MODEL_DIRECTORY"] = model_dir
                 distribution = sys.modules.get("easymode.core.distribution")
                 if distribution is None:
-                    distribution = importlib.import_module("easymode.core.distribution")
-                elif model_dir and not _same_dir(distribution.MODEL_CACHE_DIR, model_dir):
+                    distribution = _import("easymode.core.distribution")
+                elif model_dir and not _same_dir(getattr(distribution, "MODEL_CACHE_DIR", ""), model_dir):
                     distribution = importlib.reload(distribution)
+                _check_distribution(distribution)
                 if model_dir and not _same_dir(distribution.MODEL_CACHE_DIR, model_dir):
-                    raise RuntimeError(
-                        f"easymode resolved its model directory to {distribution.MODEL_CACHE_DIR}, not {model_dir}; "
-                        "this easymode reads it some other way",
+                    raise _compatibility_error(
+                        f"it resolved its model directory to {distribution.MODEL_CACHE_DIR}, not {model_dir}, "
+                        "so it reads the directory some other way",
                     )
                 return distribution
             _log(
@@ -176,12 +228,46 @@ def import_easymode(model_dir=None, *, lock_path=None, logger=None, attempts: in
 
 def go_offline(distribution) -> None:
     """Make easymode answer from the model directory alone: no registry fetch, no download, no write."""
-    if not hasattr(distribution, "_online"):
-        raise RuntimeError(
-            "easymode.core.distribution has no _online flag, so it cannot be kept off the network; "
-            "this copick-easymode supports easymode 1.x",
-        )
+    _check_distribution(distribution)  # without the _online flag it cannot be kept off the network
     distribution._online = False
+
+
+def easymode_version() -> Optional[str]:
+    """The version of the easymode this process imported, or None before it is imported."""
+    return getattr(sys.modules.get("easymode.core.config"), "version", None)
+
+
+@dataclass(frozen=True)
+class InferenceFunctions:
+    """The private easymode functions the ``.h5`` path runs (see :mod:`copick_easymode.core.inference`)."""
+
+    pad_volume: Callable
+    segment_tomogram_instance: Callable
+
+
+def inference_functions() -> InferenceFunctions:
+    """easymode's private ``_pad_volume`` and ``_segment_tomogram_instance``, checked.
+
+    Importing ``easymode.segmentation.inference`` imports TensorFlow and configures it, so the first call belongs
+    in the thread that runs inference. It also imports ``easymode.core.distribution``; when nothing imported that
+    yet, it is imported here first, under the import lock.
+    """
+    if "easymode.core.distribution" not in sys.modules:
+        import_easymode()
+    module = _import("easymode.segmentation.inference")
+    pad_volume = getattr(module, "_pad_volume", None)
+    segment_tomogram_instance = getattr(module, "_segment_tomogram_instance", None)
+    if not callable(pad_volume) or not callable(segment_tomogram_instance):
+        raise _compatibility_error(
+            "easymode.segmentation.inference lacks a callable _pad_volume or _segment_tomogram_instance",
+        )
+    return InferenceFunctions(pad_volume, segment_tomogram_instance)
+
+
+def load_network(weights: str):
+    """Build and load easymode's own 3D network for an ``.h5`` weights file (``distribution.load_model``)."""
+    distribution = sys.modules.get("easymode.core.distribution") or import_easymode()
+    return _check_distribution(distribution).load_model(weights)
 
 
 @dataclass
@@ -293,7 +379,7 @@ def resolve_models(
     """
     distribution = import_easymode(model_dir, lock_path=lock_path, logger=logger)
     directory = str(distribution.MODEL_CACHE_DIR)
-    registry = getattr(distribution, "REGISTRY_CACHE", os.path.join(directory, "registry.json"))
+    registry = str(distribution.REGISTRY_CACHE)
     writable = (
         os.path.isdir(directory)
         and os.access(directory, os.W_OK)
