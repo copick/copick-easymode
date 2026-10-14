@@ -35,7 +35,7 @@ def copick_name(feature: str) -> str:
 
     copick sanitizes names it stores (underscores become dashes) and refuses underscores in
     object names, so ``atp_synthase`` is ``atp-synthase`` in a copick project. The easymode
-    name stays the one to ask easymode for.
+    name stays the one to ask easymode for. User and session IDs are stored the same way.
     """
     from copick.util.escape import sanitize_name
 
