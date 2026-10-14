@@ -21,11 +21,19 @@ concurrency:
 
 jobs:
   test-locked:
-    name: locked py${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: locked ${{ matrix.os }} py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        include:
+          - os: ubuntu-latest
+            python-version: "3.11"
+          - os: ubuntu-latest
+            python-version: "3.12"
+          - os: ubuntu-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.13"
 
     steps:
       - uses: actions/checkout@v7
@@ -122,7 +130,9 @@ jobs:
           functions = env.inference_functions();
           assert callable(functions.pad_volume);
           assert callable(functions.segment_tomogram_instance);
-          assert env.easymode_version() == env.EASYMODE_VERSION, env.easymode_version()"
+          assert env.easymode_version() == env.EASYMODE_VERSION, env.easymode_version();
+          from scripts.real_model_smoke import installed_easymode_commit;
+          assert installed_easymode_commit() == env.EASYMODE_COMMIT, installed_easymode_commit()"
 
       - name: Run the tests, including those that need easymode
         run: uv run --no-sync pytest -q tests
