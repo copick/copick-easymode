@@ -5,6 +5,8 @@ This module provides the `copick inference easymode` command for running
 pretrained segmentation models on copick data.
 """
 
+import math
+
 import click
 from copick.cli.util import add_config_option, add_debug_option, add_user_session_options
 
@@ -327,6 +329,9 @@ def easymode(
     except ValueError as e:
         logger.critical(f"Invalid tomogram URI: {tomogram}. Expected format: 'type@voxel_size' (e.g., 'wbp@10.0')")
         ctx.fail(f"Invalid tomogram URI: {tomogram}. Error: {e}")
+    if not (math.isfinite(voxel_size) and voxel_size > 0):
+        logger.critical(f"Voxel size must be positive and finite, got {voxel_size}")
+        ctx.fail(f"Voxel size must be positive and finite, got {voxel_size}")
 
     # Parse models
     model_list = [m.strip().lower() for m in models.split(",") if m.strip()]
@@ -341,6 +346,12 @@ def easymode(
     if tta < 1 or tta > 16:
         logger.critical(f"TTA must be between 1 and 16, got {tta}")
         ctx.fail(f"TTA must be between 1 and 16, got {tta}")
+    if batch_size < 1:
+        logger.critical(f"Batch size must be at least 1, got {batch_size}")
+        ctx.fail(f"Batch size must be at least 1, got {batch_size}")
+    if not 0.0 <= threshold <= 1.0:  # a NaN fails this too
+        logger.critical(f"Threshold must be between 0.0 and 1.0, got {threshold}")
+        ctx.fail(f"Threshold must be between 0.0 and 1.0, got {threshold}")
 
     if cpu and gpus:
         ctx.fail("--cpu and --gpus exclude each other.")

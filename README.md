@@ -10,31 +10,37 @@ If you use this plugin, please cite the easymode preprint (see [Citation](#citat
 
 ## Installation
 
-easymode 1.0.0 is not published to PyPI (only older `0.0.x` releases are), so it is installed
-from GitHub. Its packaging metadata also (incorrectly) pins `numpy<2` / `tensorflow<2.12`, which
-conflicts with copick's `numpy>=2` — even though easymode runs fine on `numpy>=2`. To avoid that
-conflict, install copick-easymode and its dependencies **first** (this brings in copick and
-`numpy>=2`), then install easymode from GitHub with `--no-deps` so its bad pins are ignored:
+The `v2.0` development line targets copick 2, OME-Zarr 0.5, and Zarr v3. It supports Python
+3.11-3.13 and reads legacy OME-Zarr 0.4 / Zarr v2 projects through copick's compatibility layer.
+
+easymode is not published to PyPI (only older `0.0.x` releases are), so it is installed from
+GitHub. Its packaging metadata also (incorrectly) pins `numpy<2` / `tensorflow<2.12`, which
+conflicts with copick's NumPy 2 stack, even though easymode runs fine on NumPy 2. So install
+copick-easymode and its dependencies **first**, then the supported easymode release (1.2.5) from
+its source commit with `--no-deps`, so its pins are ignored:
 
 ```bash
-git clone https://github.com/copick/copick-easymode.git
+git clone --branch v2.0 https://github.com/copick/copick-easymode.git
 cd copick-easymode
 
-# 1. Install copick-easymode + dependencies (copick, numpy>=2, tensorflow>=2.16, easymode's runtime deps)
+# 1. Install copick-easymode + dependencies (copick 2 alpha, NumPy 2, TensorFlow 2.20+, easymode's runtime deps).
 pip install -e .
 
-# 2. Install easymode from GitHub WITHOUT dependency resolution.
-#    --no-deps keeps your numpy>=2 stack intact, and also upgrades over any older easymode
-#    (e.g. a 0.0.x already installed from PyPI).
-pip install --no-deps git+https://github.com/mgflast/easymode.git
+# 2. Install easymode 1.2.5 WITHOUT dependency resolution. --no-deps keeps your NumPy 2 stack intact,
+#    and also upgrades over any older easymode (e.g. a 0.0.x already installed from PyPI).
+pip install --no-deps "easymode @ git+https://github.com/mgflast/easymode.git@544572cfc071869113eb0567ef607791946a81c1"
 ```
 
 Verify the install:
 
 ```bash
 python -c "import numpy, easymode, importlib.metadata as m; print('numpy', numpy.__version__, '| easymode', m.version('easymode'))"
-# expected: numpy 2.x | easymode 1.0.0
+# expected: numpy 2.x | easymode 1.2.5
 ```
+
+copick-easymode imports easymode in one place, `copick_easymode.core.easymode_env`. A missing easymode, or one
+without the parts this package uses (easymode 1.x's registry-based model distribution and its tomogram tiling),
+fails with an error that names the supported release and the command above.
 
 ## Usage
 
@@ -208,11 +214,11 @@ Each segmentation is stored as a zarr array with OME-Zarr metadata.
 
 ## Requirements
 
-- Python >= 3.10, < 3.13
-- copick >= 1.24.1
+- Python >= 3.11, < 3.14
+- copick >= 2.0.0a1, < 3
 - numpy >= 2.0.2
-- TensorFlow >= 2.16
-- easymode (installed separately from GitHub — see [Installation](#installation))
+- TensorFlow >= 2.20, < 3
+- easymode 1.2.5, commit `544572cfc071869113eb0567ef607791946a81c1` (installed separately; see [Installation](#installation))
 
 ## Citation
 

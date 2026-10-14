@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence,
 
 import numpy as np
 
+from copick_easymode.core import easymode_env
+
 if TYPE_CHECKING:
     from copick.models import CopickRoot, CopickRun
 
@@ -46,8 +48,9 @@ class PreparedVolume:
 
 def prepare_tomogram(volume: np.ndarray, input_apix: float, model_apix: float = 10.0) -> PreparedVolume:
     """Stage 1 (CPU) of :func:`segment_tomogram_from_array`: rescale to the model's voxel size, normalize, pad."""
-    from easymode.segmentation.inference import _pad_volume
     from scipy.ndimage import zoom
+
+    easymode = easymode_env.inference_functions()
 
     volume = volume.astype(np.float32)
     original_shape = volume.shape
@@ -66,14 +69,13 @@ def prepare_tomogram(volume: np.ndarray, input_apix: float, model_apix: float = 
     volume /= np.std(volume[:, _k_margin:-_k_margin, _l_margin:-_l_margin]) + 1e-7
 
     # Pad volume to be divisible by 32
-    volume, padding = _pad_volume(volume)
+    volume, padding = easymode.pad_volume(volume)
     return PreparedVolume(volume=volume, padding=padding, original_shape=original_shape, rescaled=rescaled)
 
 
 def infer_tomogram(model, prepared: PreparedVolume, tta: int = 1, batch_size: int = 2) -> np.ndarray:
     """Stage 2 (GPU): the sum of the ``tta`` augmented passes over the padded volume."""
-    from easymode.segmentation.inference import _segment_tomogram_instance
-
+    easymode = easymode_env.inference_functions()
     volume = prepared.volume
     segmented_volume = np.zeros_like(volume)
 
@@ -102,7 +104,7 @@ def infer_tomogram(model, prepared: PreparedVolume, tta: int = 1, batch_size: in
         tta_vol = tta_vol if not k_fx[j] else np.flip(tta_vol, axis=1)
         tta_vol = np.rot90(tta_vol, k=2 * k_yz[j], axes=(0, 1))
 
-        segmented_tta_vol = _segment_tomogram_instance(tta_vol, model, batch_size, tile_size, overlap)
+        segmented_tta_vol = easymode.segment_tomogram_instance(tta_vol, model, batch_size, tile_size, overlap)
 
         segmented_tta_vol = np.rot90(segmented_tta_vol, k=-2 * k_yz[j], axes=(0, 1))
         segmented_tta_vol = segmented_tta_vol if not k_fx[j] else np.flip(segmented_tta_vol, axis=1)
@@ -387,11 +389,9 @@ def load_stages(model: "ResolvedModel", settings: InferenceSettings, logger=None
         )
 
     # Imported here rather than first inside a stage thread (it configures TensorFlow at import).
-    import easymode.segmentation.inference  # noqa: F401
-    from easymode.core.distribution import load_model
-
+    easymode_env.inference_functions()
     model_apix = model.apix if model.apix is not None else 10.0
-    network = load_model(model.weights)
+    network = easymode_env.load_network(model.weights)
     log.info(f"Model loaded from {model.weights}, inference at {model_apix} A/px")
     return Stages(
         prepare=lambda volume: prepare_tomogram(volume, settings.voxel_size, model_apix),
@@ -513,8 +513,6 @@ def run_easymode_inference(
         Dictionary with processing statistics: processed, skipped, errors, and items (one record per run
         and model, with its stage timings).
     """
-    from copick_easymode.core.easymode_env import import_easymode, resolve_model
-
     stats = new_stats()
 
     # Configure GPUs before TensorFlow initializes
@@ -534,7 +532,7 @@ def run_easymode_inference(
             logger.warning("No runs found to process.")
         return stats
 
-    distribution = import_easymode(model_dir, logger=logger)
+    distribution = easymode_env.import_easymode(model_dir, logger=logger)
     settings = InferenceSettings(
         tomo_type=tomo_type,
         voxel_size=voxel_size,
@@ -548,7 +546,7 @@ def run_easymode_inference(
 
     config_modified = False
     for model_name in models:
-        resolved, _reason = resolve_model(distribution, model_name, logger)
+        resolved, _reason = easymode_env.resolve_model(distribution, model_name, logger)
         if resolved is None:
             error_msg = f"Model '{model_name}' not found. Skipping."
             if logger:
