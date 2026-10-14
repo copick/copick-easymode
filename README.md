@@ -165,7 +165,9 @@ easymode publishes them in two formats, and both run in the same process and on 
   is reduced to 8 for these, the most Ais supports.
 
 copick does not allow underscores in object names, so a feature such as `atp_synthase` is written to copick as
-`atp-synthase` (segmentation and object name alike); pass the easymode name to `-m`.
+`atp-synthase` (segmentation and object name alike); pass the easymode name to `-m`. `--user-id` and `--session-id`
+are stored the same way (`my_user` becomes `my-user`), and existing segmentations are looked up under the stored
+IDs, so a rerun finds them.
 
 ## Command Options
 
@@ -206,10 +208,12 @@ You can edit the config file afterward to add additional metadata like `emdb_id`
 Segmentations are stored in the copick project at:
 
 ```
-{overlay_root}/ExperimentRuns/{run_name}/VoxelSpacing{voxel_size:.3f}/Segmentations/
+{overlay_root}/ExperimentRuns/{run_name}/Segmentations/
 ```
 
-Each segmentation is stored as a zarr array with OME-Zarr metadata.
+Each single-label segmentation is stored as a `uint8` zarr array with OME-Zarr metadata, read and written through
+copick alone. With `--overwrite`, an existing segmentation entity is reused and only replaced once the new result is
+ready, so a run whose inference fails leaves it untouched.
 
 ## Requirements
 

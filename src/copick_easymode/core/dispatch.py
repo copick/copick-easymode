@@ -5,8 +5,9 @@ TensorFlow computes on one GPU per process, so the runs are split over one worke
 ``easymode segment`` and ``ais segment`` do it. The parent process
 
 1. resolves the GPUs from the allocation (:mod:`copick_easymode.core.devices`),
-2. opens the project, checks the requested runs and, with ``add_objects``, adds the object definitions and
-   saves the config (the only process that ever writes it),
+2. opens the project, settles the user and session IDs as copick stores them (sanitized; the workers write and
+   look for existing segmentations under exactly these), checks the requested runs and, with ``add_objects``,
+   adds the object definitions and saves the config (the only process that ever writes it),
 3. resolves every model once (:func:`copick_easymode.core.easymode_env.resolve_models`): a missing model fails
    here, before any GPU time is spent,
 4. starts one worker per GPU (``multiprocessing`` spawn), each with exactly its own device in
@@ -42,7 +43,13 @@ from copick_easymode.core.devices import (
     visible_gpus,
     worker_environment,
 )
-from copick_easymode.core.inference import InferenceSettings, new_stats, segment_with_models, select_runs
+from copick_easymode.core.inference import (
+    InferenceSettings,
+    copick_settings,
+    new_stats,
+    segment_with_models,
+    select_runs,
+)
 
 REPORT_TOOL = "copick-easymode"
 
@@ -338,8 +345,8 @@ def dispatch_easymode_inference(
         tomo_type: Tomogram type (e.g., 'wbp').
         voxel_size: Voxel size in Angstroms.
         models: easymode features to run, one after another.
-        user_id: User ID for created segmentations.
-        session_id: Session ID for created segmentations.
+        user_id: User ID for created segmentations (None: the project's), stored as copick sanitizes it.
+        session_id: Session ID for created segmentations, stored as copick sanitizes it.
         tta: Test-time augmentation level (1-16; an .scnm model uses at most 8).
         batch_size: Batch size for inference.
         threshold: Probability threshold for binarizing a segmentation.
@@ -417,6 +424,20 @@ def dispatch_easymode_inference(
         import copick
 
         root = copick.from_file(str(config_path))
+        # copick's identities, settled here once: every worker writes, and looks for existing output, under them.
+        settings = copick_settings(
+            root,
+            tomo_type=tomo_type,
+            voxel_size=voxel_size,
+            user_id=user_id,
+            session_id=session_id,
+            tta=tta,
+            batch_size=batch_size,
+            threshold=threshold,
+            overwrite=overwrite,
+            logger=log,
+        )
+        report.update(user_id=settings.user_id, session_id=settings.session_id)
         runs, unknown = select_runs(root, run_names)
         for name in unknown:
             message = f"Run '{name}' not found in the project"
@@ -466,16 +487,6 @@ def dispatch_easymode_inference(
             )
         plan = plan_workers(names, devices, cpu=cpu, max_workers=max_workers)
         per_worker = threads_per_worker(len(plan), threads, env)
-        settings = InferenceSettings(
-            tomo_type=tomo_type,
-            voxel_size=voxel_size,
-            user_id=user_id,
-            session_id=session_id,
-            tta=tta,
-            batch_size=batch_size,
-            threshold=threshold,
-            overwrite=overwrite,
-        )
         specs = [
             WorkerSpec(
                 index=index,

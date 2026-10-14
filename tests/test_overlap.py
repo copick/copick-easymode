@@ -181,7 +181,7 @@ def test_the_overlapped_loop_writes_exactly_the_serial_result(tmp_path, conv3d):
     assert all({"read", "prepare", "infer", "finish", "write"} <= set(item["seconds"]) for item in stats["items"])
     assert len(captured) == len(root.runs)
     for run, probabilities in ((run, captured[i]) for i, run in enumerate(root.runs)):
-        tomogram = run.get_voxel_spacing(12.0).get_tomogram("wbp").numpy()
+        tomogram = run.get_voxel_spacing(12.0).get_tomograms(tomo_type="wbp")[0].numpy()
         serial = segment_tomogram_from_array(conv3d, tomogram, 12.0, 10.0, tta=2, batch_size=1)
         assert np.array_equal(probabilities, serial), run.name
         assert np.array_equal(_segmentation(run), (serial >= 0.5).astype(np.uint8)), run.name
