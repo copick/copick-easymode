@@ -14,7 +14,9 @@ with the defaults easymode's ``ais segment`` call leaves in place (whole Z range
 512 px XY tiles with a 64 px discarded border, no post-blur).
 
 The result is the same 0-1 probability map ``segment_tomogram_from_array`` returns for an
-``.h5`` model, so thresholding and everything downstream is shared.
+``.h5`` model, so thresholding and everything downstream is shared. Like Ais, inference is split
+into a CPU stage before (:func:`prepare_scnm`) and after (:func:`finish_scnm`) the GPU stage
+(:func:`infer_scnm`), so that neighboring tomograms' CPU work can overlap a tomogram's inference.
 """
 
 import glob
@@ -285,22 +287,38 @@ def _infer_slab(scnm: ScnmModel, vi, tile=SLAB_TILE, overlap=SLAB_OVERLAP):
     return si
 
 
-def segment_volume_scnm(scnm: ScnmModel, volume: np.ndarray, data_apix: float, tta: int = 1, batch_size: int = 1):
-    """Segment a (Z, Y, X) tomogram at ``data_apix`` A/px with an ``.scnm`` model.
+@dataclass
+class PreparedScnmVolume:
+    """A tomogram ready for an ``.scnm`` model, and what maps the model's output back onto it.
 
-    Returns a float32 probability map in [0, 1] of the input's shape. ``tta`` above
-    :data:`MAX_TTA` is an error here; the caller decides whether to clamp and say so.
+    ``volume`` is the network input; the overlapped loop drops it once inference is done.
     """
-    from scipy.ndimage import zoom
 
+    volume: Any
+    padding: tuple
+    original_shape: tuple
+
+
+def _check_tta(tta: int) -> None:
     if not 1 <= tta <= MAX_TTA:
         raise ValueError(f"tta must be between 1 and {MAX_TTA} for an .scnm model, got {tta}")
-    original_shape = volume.shape
+
+
+def prepare_scnm(scnm: ScnmModel, volume: np.ndarray, data_apix: float) -> PreparedScnmVolume:
+    """Stage 1 (CPU): normalize, rescale to the model's voxel size and pad, as Ais's ``_preprocess_tomo``."""
+    original_shape = tuple(volume.shape)
     prepared, padding = _preprocess(volume, data_apix, scnm)
+    return PreparedScnmVolume(volume=prepared, padding=padding, original_shape=original_shape)
+
+
+def infer_scnm(scnm: ScnmModel, prepared: PreparedScnmVolume, tta: int = 1, batch_size: int = 1) -> np.ndarray:
+    """Stage 2 (GPU): the sum of the ``tta`` augmented passes, unpadded, at the model's voxel size."""
+    _check_tta(tta)
+    volume, padding = prepared.volume, prepared.padding
     pt, pb, pl, pr = padding
-    seg = np.zeros((prepared.shape[0], prepared.shape[1] - pt - pb, prepared.shape[2] - pl - pr), dtype=np.float32)
+    seg = np.zeros((volume.shape[0], volume.shape[1] - pt - pb, volume.shape[2] - pl - pr), dtype=np.float32)
     for k in range(tta):
-        vi = np.rot90(prepared, k=_TTA_ROTATIONS[k], axes=(1, 2))
+        vi = np.rot90(volume, k=_TTA_ROTATIONS[k], axes=(1, 2))
         if _TTA_FLIPS[k]:
             vi = np.flip(vi, axis=2)
         vi = np.ascontiguousarray(vi)
@@ -309,6 +327,14 @@ def segment_volume_scnm(scnm: ScnmModel, volume: np.ndarray, data_apix: float, t
             si = np.flip(si, axis=2)
         si = np.rot90(si, k=-_TTA_ROTATIONS[k], axes=(1, 2))
         seg += _unpad_xy(si, padding)
+    return seg
+
+
+def finish_scnm(seg: np.ndarray, prepared: PreparedScnmVolume, tta: int = 1) -> np.ndarray:
+    """Stage 3 (CPU): average the passes and rescale back to the input's shape; a float32 map in [0, 1]."""
+    from scipy.ndimage import zoom
+
+    original_shape = prepared.original_shape
     seg = np.clip(seg / tta, 0.0, 1.0)
     if seg.shape != tuple(original_shape):
         seg = zoom(
@@ -318,3 +344,15 @@ def segment_volume_scnm(scnm: ScnmModel, volume: np.ndarray, data_apix: float, t
             prefilter=False,
         )
     return seg.astype(np.float32)
+
+
+def segment_volume_scnm(scnm: ScnmModel, volume: np.ndarray, data_apix: float, tta: int = 1, batch_size: int = 1):
+    """Segment a (Z, Y, X) tomogram at ``data_apix`` A/px with an ``.scnm`` model.
+
+    Returns a float32 probability map in [0, 1] of the input's shape. ``tta`` above
+    :data:`MAX_TTA` is an error here; the caller decides whether to clamp and say so.
+    This is :func:`prepare_scnm`, :func:`infer_scnm` and :func:`finish_scnm` in sequence.
+    """
+    _check_tta(tta)
+    prepared = prepare_scnm(scnm, volume, data_apix)
+    return finish_scnm(infer_scnm(scnm, prepared, tta, batch_size), prepared, tta)
