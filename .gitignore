@@ -9,6 +9,9 @@ build/
 dist/
 .pytest_cache/
 .ruff_cache/
+.coverage
+.venv/
+.wheel-venv/
 
 # Editors
 .idea/

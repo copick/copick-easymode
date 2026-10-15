@@ -120,6 +120,8 @@ docstring-quotes = "double"
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+# The repository root, so tests can import the validation helpers in scripts/.
+pythonpath = ["."]
 filterwarnings = [
     'error:get_tomogram is deprecated, use get_tomograms instead.*:DeprecationWarning',
     'error:Input .* contains invalid characters\. It has been sanitized to .*:UserWarning',

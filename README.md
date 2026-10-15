@@ -38,6 +38,9 @@ python -c "import numpy, easymode, importlib.metadata as m; print('numpy', numpy
 # expected: numpy 2.x | easymode 1.2.5
 ```
 
+See [VALIDATION.md](VALIDATION.md) for the deterministic tests and the opt-in, checksum-recorded real-model smoke.
+Model weights are never downloaded by normal pull-request tests.
+
 copick-easymode imports easymode in one place, `copick_easymode.core.easymode_env`. A missing easymode, or one
 without the parts this package uses (easymode 1.x's registry-based model distribution and its tomogram tiling),
 fails with an error that names the supported release and the command above.
