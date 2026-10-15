@@ -30,6 +30,18 @@ KNOWN_MODELS = [
 ]
 
 
+def copick_name(feature: str) -> str:
+    """The copick object and segmentation name of an easymode feature.
+
+    copick sanitizes names it stores (underscores become dashes) and refuses underscores in
+    object names, so ``atp_synthase`` is ``atp-synthase`` in a copick project. The easymode
+    name stays the one to ask easymode for.
+    """
+    from copick.util.escape import sanitize_name
+
+    return sanitize_name(feature, suppress_warnings=True)
+
+
 def list_available_models(online: bool = True) -> list[str]:
     """
     List available easymode models.

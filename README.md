@@ -65,25 +65,17 @@ copick inference easymode -c config.json -m ribosome -t wbp@10.0 --overwrite
 
 ## Available Models
 
-The following pretrained segmentation models are available:
+Every feature in easymode's model registry can be run; `easymode list` prints them with their versions.
+easymode publishes them in two formats, and both run in the same process and on the same GPU:
 
-| Model | Description |
-|-------|-------------|
-| `ribosome` | Ribosome particles |
-| `membrane` | Cellular membranes |
-| `microtubule` | Microtubules |
-| `actin` | Actin filaments |
-| `cytoplasm` | Cytoplasm region |
-| `mitochondrion` | Mitochondria |
-| `nucleus` | Nuclear region |
-| `nuclear_envelope` | Nuclear envelope |
-| `npc` | Nuclear pore complex |
-| `cytoplasmic_granule` | Cytoplasmic granules |
-| `mitochondrial_granule` | Mitochondrial granules |
-| `prohibitin` | Prohibitin complexes |
-| `tric` | TRiC/CCT chaperonin |
-| `vault` | Vault particles |
-| `void` | Void/empty regions |
+- **`.h5` (3D)**: `ribosome`, `microtubule` and `tric`, loaded through `easymode.core.distribution.load_model`.
+- **`.scnm` (Ais 2D-engine models, 2.5D slice or 3D slab)**: every other feature, e.g. `actin`, `membrane`,
+  `proteasome`, `atp_synthase`, `cytoplasm`, `nucleus`. `copick_easymode.core.scnm` loads them in Keras 3 and runs
+  a port of `ais segment`'s inference (Ais 1.2.38), so neither Ais nor its TensorFlow 2.11 is needed. `--tta` above 8
+  is reduced to 8 for these, the most Ais supports.
+
+copick does not allow underscores in object names, so a feature such as `atp_synthase` is written to copick as
+`atp-synthase` (segmentation and object name alike); pass the easymode name to `-m`.
 
 ## Command Options
 
@@ -94,7 +86,7 @@ The following pretrained segmentation models are available:
 | `-t, --tomogram` | Tomogram URI as `type@voxel_size` e.g., `wbp@10.0` (required) |
 | `-r, --run` | Run name(s) to process, comma-separated. Empty = all runs |
 | `--gpus` | Comma-separated GPU IDs. Default: all available |
-| `--tta` | Test-time augmentation level 1-16. Higher = better but slower. Default: 4 |
+| `--tta` | Test-time augmentation level 1-16 (8 at most for an `.scnm` model). Higher = better but slower. Default: 4 |
 | `--batch-size` | Batch size for inference. Default: 1 |
 | `--add-objects/--no-add-objects` | Add object definitions to config if missing. Default: enabled |
 | `--overwrite/--no-overwrite` | Overwrite existing segmentations. Default: disabled |
