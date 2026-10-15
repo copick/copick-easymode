@@ -26,7 +26,7 @@
       "bump-patch-for-minor-pre-major": false,
       "draft": false,
       "prerelease": true,
-      "pull-request-footer": "Merging this PR will publish a copick-easymode alpha prerelease to PyPI."
+      "pull-request-footer": "Merging this PR will create a new alpha prerelease for copick-easymode."
     }
   }
 }
