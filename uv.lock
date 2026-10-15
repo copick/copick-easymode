@@ -525,8 +525,11 @@ dev = [
     { name = "ruff" },
 ]
 test = [
+    { name = "ome-zarr-models" },
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "zarr", version = "3.1.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "zarr", version = "3.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
 
 [package.metadata]
@@ -540,6 +543,7 @@ requires-dist = [
     { name = "lxml" },
     { name = "mrcfile" },
     { name = "numpy", specifier = ">=2.0.2" },
+    { name = "ome-zarr-models", marker = "extra == 'test'", specifier = ">=1.6" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.2.0" },
     { name = "psutil" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0.0" },
@@ -552,6 +556,7 @@ requires-dist = [
     { name = "tensorflow", specifier = ">=2.20,<3" },
     { name = "tifffile" },
     { name = "tqdm" },
+    { name = "zarr", marker = "extra == 'test'", specifier = ">=3.1.6,<4" },
 ]
 provides-extras = ["dev", "test"]
 
@@ -2337,6 +2342,9 @@ resolution-markers = [
     "python_full_version > '3.11' and python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version > '3.11' and python_full_version < '3.12' and sys_platform == 'emscripten'",
     "python_full_version > '3.11' and python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version <= '3.11' and sys_platform == 'win32'",
+    "python_full_version <= '3.11' and sys_platform == 'emscripten'",
+    "python_full_version <= '3.11' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" } },

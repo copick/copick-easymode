@@ -303,6 +303,7 @@ def easymode(
     from copick.util.log import get_logger
 
     from copick_easymode.core.dispatch import dispatch_easymode_inference
+    from copick_easymode.core.inference import copick_identity
 
     logger = get_logger(__name__, debug=debug)
 
@@ -355,6 +356,14 @@ def easymode(
 
     if cpu and gpus:
         ctx.fail("--cpu and --gpus exclude each other.")
+
+    # copick stores user and session IDs sanitized (my_user is my-user); refuse one it cannot store at all.
+    for what, value in (("user ID", user_id), ("session ID", session_id)):
+        try:
+            copick_identity(value, what)
+        except ValueError as e:
+            logger.critical(str(e))
+            ctx.fail(str(e))
 
     logger.info(f"Models: {model_list}")
     logger.info(f"Tomogram: {tomo_type}@{voxel_size}")
