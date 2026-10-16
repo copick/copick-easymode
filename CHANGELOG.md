@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-alpha.3](https://github.com/copick/copick-easymode/compare/copick-easymode-v2.0.0-alpha.2...copick-easymode-v2.0.0-alpha.3) (2026-10-16)
+
+
+### Continuous Integration
+
+* v2.0 release PR titles without the branch scope ([#62](https://github.com/copick/copick-easymode/issues/62)) ([24dd9ca](https://github.com/copick/copick-easymode/commit/24dd9ca6b100f0d44ba2f5fa3446896336dbf256))
+
 ## [2.0.0-alpha.2](https://github.com/copick/copick-easymode/compare/copick-easymode-v2.0.0-alpha.1...copick-easymode-v2.0.0-alpha.2) (2026-10-16)
 
 
