@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.3.0...copick-easymode-v0.4.0) (2026-10-15)
+
+
+### Features
+
+* one inference worker per GPU, and reads and writes overlapped with inference ([#52](https://github.com/copick/copick-easymode/issues/52)) ([38cd614](https://github.com/copick/copick-easymode/commit/38cd61438249ca1caa57578fb34bbcc3d77c4302))
+
+
+### Bug Fixes
+
+* bump chanzuckerberg/github-actions from 6.41.2 to 6.41.3 ([#56](https://github.com/copick/copick-easymode/issues/56)) ([1a033ec](https://github.com/copick/copick-easymode/commit/1a033ec9ae2f2dad8d35c5e76ab585edf29f3f5b))
+* validate CLI input, normalize copick identities and check the easymode runtime ([#55](https://github.com/copick/copick-easymode/issues/55)) ([f3f43a0](https://github.com/copick/copick-easymode/commit/f3f43a0b33282d6a3f52c2c691048169059444c2))
+
 ## [0.3.0](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.2.0...copick-easymode-v0.3.0) (2026-10-01)
 
 
