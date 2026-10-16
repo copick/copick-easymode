@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.0.0-alpha.2](https://github.com/copick/copick-easymode/compare/copick-easymode-v2.0.0-alpha.1...copick-easymode-v2.0.0-alpha.2) (2026-10-16)
+
+
+### Features
+
+* adopt the copick 2 alpha runtime ([#40](https://github.com/copick/copick-easymode/issues/40)) ([2bf21d2](https://github.com/copick/copick-easymode/commit/2bf21d24ffbaac7c688b655977cf33f742d10b0d))
+* one inference worker per GPU, and reads and writes overlapped with inference ([#54](https://github.com/copick/copick-easymode/issues/54)) ([1f18709](https://github.com/copick/copick-easymode/commit/1f18709d6dcd64ff6dc9ca7d65222e45d269b262))
+* run easymode's .scnm (Ais 2D-engine) models in-process ([#53](https://github.com/copick/copick-easymode/issues/53)) ([622ef3f](https://github.com/copick/copick-easymode/commit/622ef3f5f76e4a1cac1d4ac6879ce5ff7dac68fa))
+
+
+### Bug Fixes
+
+* delegate v3 inference I/O through copick ([#41](https://github.com/copick/copick-easymode/issues/41)) ([5717754](https://github.com/copick/copick-easymode/commit/57177545546bc30b2592a71d68804c3dd10dbb13))
+
+
+### Tests
+
+* qualify the migrated inference path ([#39](https://github.com/copick/copick-easymode/issues/39)) ([e055357](https://github.com/copick/copick-easymode/commit/e055357a3076fc332081af6e5e87e4e035466cf9))
+
+
+### Continuous Integration
+
+* release v2.0 alphas on GitHub only until a PyPI publisher exists ([#61](https://github.com/copick/copick-easymode/issues/61)) ([ef001f1](https://github.com/copick/copick-easymode/commit/ef001f105af835ca5a8e71d187300c8fed4eeedc))
+
 ## [2.0.0-alpha.1](https://github.com/copick/copick-easymode/compare/copick-easymode-v0.2.0...copick-easymode-v2.0.0-alpha.1) (2026-10-06)
 
 
