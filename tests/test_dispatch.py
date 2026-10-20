@@ -78,6 +78,47 @@ def test_a_cpu_run_reports_what_it_did_and_exits_zero(tmp_path, isolated_env):
     assert json.loads(report_path.read_text())["skipped"] == 3
 
 
+def test_xla_reaches_the_worker_and_the_report_records_a_fallback(tmp_path, isolated_env, monkeypatch):
+    from copick_easymode.core import xla
+
+    config, _ = make_project(tmp_path, RUNS)
+    model_dir = make_model_dir(tmp_path)
+    report_path = tmp_path / "easymode.json"
+
+    plain = _invoke(config, model_dir, report_path, "-m", "tiny", "--cpu")
+    assert plain.exit_code == 0, plain.output
+    report = json.loads(report_path.read_text())
+    assert report["xla"] is False and report["workers"][0]["xla_fallbacks"] == []
+
+    # XLA on the CPU: the tiny model compiles, and every run is segmented through it.
+    result = _invoke(config, model_dir, report_path, "-m", "tiny", "--cpu", "--xla", "--overwrite")
+    assert result.exit_code == 0, result.output
+    report = json.loads(report_path.read_text())
+    assert report["xla"] is True and report["processed"] == 3
+    assert report["workers"][0]["xla_fallbacks"] == []
+
+    # A compiled call that raises: the worker continues with the plain model and its report entry says why.
+    created = []
+    init = xla.XLAModel.__init__
+
+    def broken(x):
+        raise RuntimeError("ptxas too old")
+
+    def failing_init(self, *args, **kwargs):
+        init(self, *args, **kwargs)
+        self._compiled = broken
+        created.append(self)
+
+    monkeypatch.setattr(xla.XLAModel, "__init__", failing_init)
+    result = _invoke(config, model_dir, report_path, "-m", "tiny", "--cpu", "--xla", "--overwrite")
+    assert result.exit_code == 0, result.output
+    report = json.loads(report_path.read_text())
+    assert report["status"] == "complete" and report["processed"] == 3 and len(created) == 1
+    [worker] = report["workers"]
+    assert worker["xla_fallbacks"] == [{"feature": "tiny", "reason": "RuntimeError: ptxas too old"}]
+    assert all(_segmented(config, run) for run in RUNS)
+
+
 def test_a_missing_model_fails_before_any_worker(tmp_path, isolated_env):
     config, _ = make_project(tmp_path, RUNS)
     model_dir = make_model_dir(tmp_path)
