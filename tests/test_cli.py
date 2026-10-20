@@ -78,6 +78,7 @@ def test_command_parses_lists_and_delegates(cli_env, tmp_path):
             "2",
             "--threshold",
             "0.25",
+            "--xla",
             "--gpus",
             "0,1",
             "--max-workers",
@@ -107,6 +108,7 @@ def test_command_parses_lists_and_delegates(cli_env, tmp_path):
         batch_size=2,
         threshold=0.25,
         overwrite=True,
+        xla=True,
         gpus="0,1",
         cpu=False,
         max_workers=2,
@@ -118,6 +120,17 @@ def test_command_parses_lists_and_delegates(cli_env, tmp_path):
         debug=False,
         logger=dispatch.call_args.kwargs["logger"],
     )
+
+
+def test_xla_is_off_unless_asked_for(cli_env):
+    config_path, dispatch = cli_env
+    dispatch.side_effect = None
+    dispatch.return_value = _report()
+
+    for flag, expected in (([], False), (["--no-xla"], False), (["--xla"], True)):
+        result = CliRunner().invoke(easymode, ["-c", str(config_path), "-m", "ribosome", "-t", "wbp@10", *flag])
+        assert result.exit_code == 0, result.output
+        assert dispatch.call_args.kwargs["xla"] is expected
 
 
 def test_a_failed_report_exits_nonzero_and_lists_the_errors(cli_env):

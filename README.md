@@ -64,6 +64,9 @@ copick inference easymode -c config.json -m ribosome -t wbp@10.0 --cpu
 # High quality with test-time augmentation
 copick inference easymode -c config.json -m ribosome -t wbp@10.0 --tta 16
 
+# XLA-compiled inference, about 3x faster on a GPU
+copick inference easymode -c config.json -m microtubule -t wbp@10.0 --xla
+
 # Don't add object definitions to config
 copick inference easymode -c config.json -m ribosome -t wbp@10.0 --no-add-objects
 
@@ -108,6 +111,15 @@ in the command's own process.
   cannot collide.
 - **Config writes.** With `--add-objects`, only the parent process adds object definitions and saves the config,
   before the workers start; workers re-open the project from the config file and never write it.
+- **XLA.** `--xla` runs each model's forward pass as one XLA-compiled function (`tf.function(jit_compile=True)`),
+  which fuses the memory-bound work between the convolutions. Each worker compiles at the first call of each input
+  shape, which takes tens of seconds and is logged as `XLA compiled <feature> for input (...)`, and reuses it for every
+  later tile of that shape. On 10521 tomograms of 320 x 772 x 548 voxels, at TTA 4 on one L40S with TensorFlow 2.21,
+  it took the microtubule `.h5` network from 310 s to 107 s per tomogram, 2.9x, and the actin `.scnm` slab model from
+  87 s to 67 s, 1.3x. The masks matched the plain model's to an IoU of 0.9998 or better. If compiling fails, the
+  worker logs one warning, continues with the plain model and lists the model with the reason in its `xla_fallbacks`
+  in the report. It is off by default because a missing or too old `ptxas` can abort TensorFlow instead of raising an
+  error.
 - **Logs** of each worker start with `[worker k gpu X]`.
 
 ### Exit status and report
@@ -124,7 +136,7 @@ the end (`"complete"` or `"failed"`), whatever the outcome:
   "tool": "copick-easymode", "version": "0.3.0", "status": "complete",
   "config": "/data/copick_config.json", "tomogram": "wbp@10.0", "runs": ["TS_01", "TS_02", "TS_03"],
   "user_id": "copick", "session_id": "1", "tta": 4, "threshold": 0.5, "batch_size": 1, "overwrite": false,
-  "models_requested": ["microtubule"],
+  "xla": false, "models_requested": ["microtubule"],
   "models": [{"feature": "microtubule", "object": "microtubule", "weights": "/shared/easymode/models/microtubule_sv3-3d.h5",
               "kind": "h5", "tag": "sv3-3d", "timestamp": "20260916223602", "bytes": 515770304, "apix": 10.0}],
   "missing": {}, "model_directory": "/shared/easymode", "online": true, "writable": true, "easymode_version": "1.2.5",
@@ -133,9 +145,10 @@ the end (`"complete"` or `"failed"`), whatever the outcome:
     {"index": 0, "gpu": "0", "runs": ["TS_01", "TS_03"], "exitcode": 0, "seconds": 412.3, "processed": 2, "skipped": 0,
      "errors": [], "visible_devices": "0", "threads": 8,
      "items": [{"run": "TS_01", "feature": "microtubule", "status": "processed",
-                "seconds": {"read": 2.1, "prepare": 1.9, "infer": 198.0, "finish": 1.2, "write": 0.8}}]},
+                "seconds": {"read": 2.1, "prepare": 1.9, "infer": 198.0, "finish": 1.2, "write": 0.8}}],
+     "xla_fallbacks": []},
     {"index": 1, "gpu": "1", "runs": ["TS_02"], "exitcode": 0, "seconds": 205.7, "processed": 1, "skipped": 0,
-     "errors": [], "visible_devices": "1", "threads": 8, "items": []}
+     "errors": [], "visible_devices": "1", "threads": 8, "items": [], "xla_fallbacks": []}
   ],
   "processed": 3, "skipped": 0, "errors": [],
   "started_utc": "2026-10-08T20:00:00Z", "finished_utc": "2026-10-08T20:06:55Z", "seconds": 414.9
@@ -144,7 +157,8 @@ the end (`"complete"` or `"failed"`), whatever the outcome:
 
 `missing` names each model that could not be resolved, with easymode's reason. A worker's `gpu` is the
 `CUDA_VISIBLE_DEVICES` value it ran with (`null` with `--cpu`), and its `exitcode` is its process exit status (0 when
-all of its runs were handled without an error).
+all of its runs were handled without an error). With `--xla`, a worker's `xla_fallbacks` lists each model that fell
+back to plain inference, as `{"feature": ..., "reason": ...}`; its runs still count as processed.
 
 ### Python API
 
@@ -187,6 +201,7 @@ IDs, so a rerun finds them.
 | `--tta` | Test-time augmentation level 1-16 (8 at most for an `.scnm` model). Higher = better but slower. Default: 4 |
 | `--batch-size` | Batch size for inference. Default: 1 |
 | `--threshold` | Probability threshold for binarizing a segmentation. Default: 0.5 |
+| `--xla/--no-xla` | Run each model as one XLA-compiled function: up to about 3x faster on a GPU, most for the 3D `.h5` networks. Default: disabled |
 | `--add-objects/--no-add-objects` | Add object definitions to config if missing. Default: enabled |
 | `--overwrite/--no-overwrite` | Overwrite existing segmentations. Default: disabled |
 | `--user-id` | User ID for created segmentations. Default: copick |

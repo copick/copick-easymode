@@ -93,6 +93,7 @@ def _worker_entry(spec: WorkerSpec, **updates) -> dict:
         "visible_devices": None,
         "threads": spec.threads,
         "items": [],
+        "xla_fallbacks": [],
     }
     entry.update(updates)
     return entry
@@ -165,6 +166,8 @@ def run_worker(spec: WorkerSpec, logger=None, prefixed: bool = False) -> dict:
     visible = os.environ.get(ENV_VISIBLE)
     stats = new_stats()
     log.info(f"Starting: {len(spec.runs)} run(s), {spec.threads} thread(s), {ENV_VISIBLE}={visible!r}")
+    if spec.settings.xla:
+        log.info("XLA on: each model runs as one XLA-compiled function, compiled at the first call of each input shape")
     try:
         distribution = import_easymode(spec.model_dir, lock_path=spec.lock_path, logger=log)
         go_offline(distribution)
@@ -202,6 +205,7 @@ def run_worker(spec: WorkerSpec, logger=None, prefixed: bool = False) -> dict:
         errors=list(stats["errors"]),
         visible_devices=visible,
         items=stats["items"],
+        xla_fallbacks=list(stats["xla_fallbacks"]),
     )
 
 
@@ -324,6 +328,7 @@ def dispatch_easymode_inference(
     batch_size: int = 1,
     threshold: float = 0.5,
     overwrite: bool = False,
+    xla: bool = False,
     gpus: Optional[str] = None,
     cpu: bool = False,
     max_workers: Optional[int] = None,
@@ -351,6 +356,8 @@ def dispatch_easymode_inference(
         batch_size: Batch size for inference.
         threshold: Probability threshold for binarizing a segmentation.
         overwrite: Overwrite existing segmentations instead of skipping their runs.
+        xla: Run each model as one XLA-compiled function (see :mod:`copick_easymode.core.xla`); a worker whose model
+            gave up XLA lists it, with the reason, in its ``xla_fallbacks``.
         gpus: GPUs to use (see :func:`copick_easymode.core.devices.visible_gpus`); None means all of the
             allocation.
         cpu: One worker without a GPU.
@@ -389,6 +396,7 @@ def dispatch_easymode_inference(
         "threshold": threshold,
         "batch_size": batch_size,
         "overwrite": overwrite,
+        "xla": xla,
         "models_requested": list(models),
         "models": [],
         "missing": {},
@@ -435,6 +443,7 @@ def dispatch_easymode_inference(
             batch_size=batch_size,
             threshold=threshold,
             overwrite=overwrite,
+            xla=xla,
             logger=log,
         )
         report.update(user_id=settings.user_id, session_id=settings.session_id)
