@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-alpha.4](https://github.com/copick/copick-easymode/compare/copick-easymode-v2.0.0-alpha.3...copick-easymode-v2.0.0-alpha.4) (2026-10-21)
+
+
+### Features
+
+* --xla, XLA-compiled inference for .h5 and .scnm models ([#65](https://github.com/copick/copick-easymode/issues/65)) ([75ef67b](https://github.com/copick/copick-easymode/commit/75ef67b56200025f70bf711bc8439c6d77409bea))
+
 ## [2.0.0-alpha.3](https://github.com/copick/copick-easymode/compare/copick-easymode-v2.0.0-alpha.2...copick-easymode-v2.0.0-alpha.3) (2026-10-16)
 
 
