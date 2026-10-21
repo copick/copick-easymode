@@ -120,7 +120,7 @@ jobs:
       - name: Install the supported easymode source without its conflicting dependencies
         run: >
           uv pip install --python .venv/bin/python --no-deps
-          "easymode @ git+https://github.com/mgflast/easymode.git@544572cfc071869113eb0567ef607791946a81c1"
+          "easymode @ git+https://github.com/mgflast/easymode.git@00ab9035b19ad30dca46fbe97bc77e6f11a2d981"
 
       - name: Verify the easymode boundary
         run: >

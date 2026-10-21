@@ -11,14 +11,14 @@ uv build
 uv run --no-sync python scripts/inspect_distribution.py dist
 ```
 
-The tagged-runtime compatibility check installs the supported easymode release (1.2.5) from its source commit,
+The tagged-runtime compatibility check installs the supported easymode release (1.2.6) from its source commit,
 bypassing its conflicting dependency metadata, checks the easymode boundary, and runs the whole suite again, now
 including the multi-GPU dispatch and overlapped-loop tests that run tiny models through easymode:
 
 ```bash
 uv sync --locked --extra test
 uv pip install --no-deps \
-  "easymode @ git+https://github.com/mgflast/easymode.git@544572cfc071869113eb0567ef607791946a81c1"
+  "easymode @ git+https://github.com/mgflast/easymode.git@00ab9035b19ad30dca46fbe97bc77e6f11a2d981"
 uv run --no-sync python -c \
   "from copick_easymode.core import easymode_env as env; env.import_easymode(); env.inference_functions()"
 uv run --no-sync pytest -q tests

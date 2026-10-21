@@ -22,9 +22,9 @@ dependencies = [
     "numpy>=2.0.2",
     "scipy>=1.10.0",
     "tensorflow>=2.20,<3",
-    # easymode itself is installed separately from GitHub with `--no-deps` (see README): it is
-    # not on PyPI, and its published metadata wrongly pins numpy<2 / tensorflow<2.12, which
-    # conflicts with copick (numpy>=2). easymode runs fine on numpy>=2, so we install copick +
+    # easymode itself is installed separately from GitHub with `--no-deps` (see README): its
+    # published metadata pins numpy<2 / tensorflow<2.16 / ais-cryoet (Keras 2), which conflicts
+    # with copick (numpy>=2). easymode runs fine on numpy>=2, so we install copick +
     # numpy>=2 first and declare easymode's runtime deps here so the env is complete.
     "mrcfile",
     "huggingface_hub",
