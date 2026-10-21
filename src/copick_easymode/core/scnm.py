@@ -9,9 +9,10 @@ Keras model (``<title>_weights.h5``) and its metadata (``<title>_metadata.json``
 model loads in Keras 3 once the ``groups`` argument Keras 2 wrote into its transposed
 convolutions is dropped. So this module loads it here and ports Ais's inference:
 ``_preprocess_tomo``, ``_segmentation_thread`` and ``_infer_slab`` of
-``Ais/core/cli_fn.py`` (ais-cryoet 1.2.38, Mart G. F. So-Last, GPL-3.0 like this package),
+``Ais/core/cli_fn.py`` (ais-cryoet 1.2.40, Mart G. F. So-Last, GPL-3.0 like this package),
 with the defaults easymode's ``ais segment`` call leaves in place (whole Z range, batch 1,
-512 px XY tiles with a 64 px discarded border, no post-blur).
+a slab Z stride of half the slab depth, 512 px XY tiles with a 64 px discarded border, no
+post-blur).
 
 The result is the same 0-1 probability map ``segment_tomogram_from_array`` returns for an
 ``.h5`` model, so thresholding and everything downstream is shared. Like Ais, inference is split
@@ -28,6 +29,8 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+
+from copick_easymode.core.xla import XLAModel
 
 SCNM_SUFFIX = ".scnm"
 #: Ais's test-time augmentation: four 90-degree rotations, then the same four flipped.
@@ -190,9 +193,15 @@ def _slice_input(vi, j, depth, dimensionality):
 def _infer_slices(scnm: ScnmModel, vi, batch_size):
     si = np.zeros_like(vi, dtype=np.float32)
     n = vi.shape[0]
+    # Under XLA a short last batch is padded with zeros to batch_size, as Ais does, so the compiled function keeps one
+    # input shape; the padded rows are never read back. At batch 1, which .scnm inference runs at, no batch is short.
+    pad = isinstance(scnm.model, XLAModel)
     for start in range(0, n, batch_size):
         js = list(range(start, min(start + batch_size, n)))
-        out = _call(scnm.model, np.stack([_slice_input(vi, j, scnm.depth, scnm.dimensionality) for j in js]))
+        batch = np.stack([_slice_input(vi, j, scnm.depth, scnm.dimensionality) for j in js])
+        if pad and len(js) < batch_size:
+            batch = np.concatenate([batch, np.zeros((batch_size - len(js),) + batch.shape[1:], dtype=batch.dtype)])
+        out = _call(scnm.model, batch)
         for i, j in enumerate(js):
             si[j] = np.squeeze(out[i])
     return si

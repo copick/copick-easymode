@@ -13,11 +13,10 @@ If you use this plugin, please cite the easymode preprint (see [Citation](#citat
 The `v2.0` development line targets copick 2, OME-Zarr 0.5, and Zarr v3. It supports Python
 3.11-3.13 and reads legacy OME-Zarr 0.4 / Zarr v2 projects through copick's compatibility layer.
 
-easymode is not published to PyPI (only older `0.0.x` releases are), so it is installed from
-GitHub. Its packaging metadata also (incorrectly) pins `numpy<2` / `tensorflow<2.12`, which
-conflicts with copick's NumPy 2 stack, even though easymode runs fine on NumPy 2. So install
-copick-easymode and its dependencies **first**, then the supported easymode release (1.2.5) from
-its source commit with `--no-deps`, so its pins are ignored:
+easymode's packaging metadata pins `numpy<2` and `tensorflow<2.16` (and `ais-cryoet`, which needs
+Keras 2), which conflicts with copick's NumPy 2 stack, even though easymode runs fine on NumPy 2 and
+Keras 3. So install copick-easymode and its dependencies **first**, then the supported easymode
+release (1.2.6) from its source commit with `--no-deps`, so its pins are ignored:
 
 ```bash
 git clone --branch v2.0 https://github.com/copick/copick-easymode.git
@@ -26,16 +25,16 @@ cd copick-easymode
 # 1. Install copick-easymode + dependencies (copick 2 alpha, NumPy 2, TensorFlow 2.20+, easymode's runtime deps).
 pip install -e .
 
-# 2. Install easymode 1.2.5 WITHOUT dependency resolution. --no-deps keeps your NumPy 2 stack intact,
-#    and also upgrades over any older easymode (e.g. a 0.0.x already installed from PyPI).
-pip install --no-deps "easymode @ git+https://github.com/mgflast/easymode.git@544572cfc071869113eb0567ef607791946a81c1"
+# 2. Install easymode 1.2.6 WITHOUT dependency resolution. --no-deps keeps your NumPy 2 stack intact,
+#    and also upgrades over any older easymode already installed.
+pip install --no-deps "easymode @ git+https://github.com/mgflast/easymode.git@00ab9035b19ad30dca46fbe97bc77e6f11a2d981"
 ```
 
 Verify the install:
 
 ```bash
 python -c "import numpy, easymode, importlib.metadata as m; print('numpy', numpy.__version__, '| easymode', m.version('easymode'))"
-# expected: numpy 2.x | easymode 1.2.5
+# expected: numpy 2.x | easymode 1.2.6
 ```
 
 See [VALIDATION.md](VALIDATION.md) for the deterministic tests and the opt-in, checksum-recorded real-model smoke.
@@ -116,7 +115,8 @@ in the command's own process.
 - **Config writes.** With `--add-objects`, only the parent process adds object definitions and saves the config,
   before the workers start; workers re-open the project from the config file and never write it.
 - **XLA.** `--xla` runs each model's forward pass as one XLA-compiled function (`tf.function(jit_compile=True)`),
-  which fuses the memory-bound work between the convolutions. Each worker compiles at the first call of each input
+  which fuses the memory-bound work between the convolutions, like `easymode segment --xla` (easymode 1.2.6) and
+  `ais segment --xla` (ais-cryoet 1.2.40). Each worker compiles at the first call of each input
   shape, which takes tens of seconds and is logged as `XLA compiled <feature> for input (...)`, and reuses it for every
   later tile of that shape. On 10521 tomograms of 320 x 772 x 548 voxels, at TTA 4 on one L40S with TensorFlow 2.21,
   it took the microtubule `.h5` network from 310 s to 107 s per tomogram, 2.9x, and the actin `.scnm` slab model from
@@ -143,7 +143,7 @@ the end (`"complete"` or `"failed"`), whatever the outcome:
   "xla": false, "models_requested": ["microtubule"],
   "models": [{"feature": "microtubule", "object": "microtubule", "weights": "/shared/easymode/models/microtubule_sv3-3d.h5",
               "kind": "h5", "tag": "sv3-3d", "timestamp": "20260916223602", "bytes": 515770304, "apix": 10.0}],
-  "missing": {}, "model_directory": "/shared/easymode", "online": true, "writable": true, "easymode_version": "1.2.5",
+  "missing": {}, "model_directory": "/shared/easymode", "online": true, "writable": true, "easymode_version": "1.2.6",
   "cpu": false, "devices": ["0", "1"], "threads_per_worker": 8,
   "workers": [
     {"index": 0, "gpu": "0", "runs": ["TS_01", "TS_03"], "exitcode": 0, "seconds": 412.3, "processed": 2, "skipped": 0,
@@ -179,7 +179,7 @@ easymode publishes them in two formats, and both run in the same process and on 
 - **`.h5` (3D)**: `ribosome`, `microtubule` and `tric`, loaded through `easymode.core.distribution.load_model`.
 - **`.scnm` (Ais 2D-engine models, 2.5D slice or 3D slab)**: every other feature, e.g. `actin`, `membrane`,
   `proteasome`, `atp_synthase`, `cytoplasm`, `nucleus`. `copick_easymode.core.scnm` loads them in Keras 3 and runs
-  a port of `ais segment`'s inference (Ais 1.2.38), so neither Ais nor its TensorFlow 2.11 is needed. `--tta` above 8
+  a port of `ais segment`'s inference (Ais 1.2.40), so neither Ais nor its TensorFlow 2.11 is needed. `--tta` above 8
   is reduced to 8 for these, the most Ais supports.
 
 copick does not allow underscores in object names, so a feature such as `atp_synthase` is written to copick as
@@ -241,7 +241,7 @@ whose inference fails leaves it untouched.
 - copick >= 2.0.0a1, < 3
 - numpy >= 2.0.2
 - TensorFlow >= 2.20, < 3
-- easymode 1.2.5, commit `544572cfc071869113eb0567ef607791946a81c1` (installed separately; see [Installation](#installation))
+- easymode 1.2.6, commit `00ab9035b19ad30dca46fbe97bc77e6f11a2d981` (installed separately; see [Installation](#installation))
 
 ## Citation
 

@@ -2,12 +2,12 @@
 The one place easymode is imported: its configuration, imported safely by concurrent processes, its models
 resolved once, and the private inference functions this package runs.
 
-**The compatibility boundary.** easymode is not on PyPI, and copick-easymode uses parts of it that are not a
-public API: the registry-based model distribution (``MODEL_CACHE_DIR``, ``REGISTRY_CACHE``, the ``_online``
-flag) and the private ``_pad_volume`` and ``_segment_tomogram_instance`` of ``easymode.segmentation.inference``.
-No other module imports easymode. What is used is checked when it is imported, and a missing or incompatible
-easymode raises :class:`EasymodeCompatibilityError`, which names the supported release and the command that
-installs it (:data:`EASYMODE_INSTALL`).
+**The compatibility boundary.** copick-easymode uses parts of easymode that are not a public API: the registry-based
+model distribution (``MODEL_CACHE_DIR``, ``REGISTRY_CACHE``, the ``_online`` flag) and the private ``_pad_volume``
+and ``_segment_tomogram_instance`` of ``easymode.segmentation.inference``. No other module imports easymode. What is
+used is checked when it is imported, and a missing or incompatible easymode raises
+:class:`EasymodeCompatibilityError`, which names the supported release and the command that installs it
+(:data:`EASYMODE_INSTALL`).
 
 **The import race.** ``easymode/core/config.py`` runs ``parse_settings()`` at import, and that function
 *rewrites* ``~/easymode/settings.txt`` (opening for writing truncates it, then the JSON is dumped). Processes
@@ -45,10 +45,11 @@ try:
 except ImportError:  # pragma: no cover - not POSIX: no cross-process lock
     fcntl = None
 
-#: The easymode release this package is tested against, and its source commit (easymode is not on PyPI).
-EASYMODE_VERSION = "1.2.5"
-EASYMODE_COMMIT = "544572cfc071869113eb0567ef607791946a81c1"
-#: easymode's own metadata pins numpy<2 and tensorflow<2.12, so it is installed without its dependencies.
+#: The easymode release this package is tested against, and its source commit (tag ``v1.2.6``).
+EASYMODE_VERSION = "1.2.6"
+EASYMODE_COMMIT = "00ab9035b19ad30dca46fbe97bc77e6f11a2d981"
+#: easymode's own metadata pins numpy<2, tensorflow<2.16 and ais-cryoet (Keras 2), so it is installed without its
+#: dependencies.
 EASYMODE_INSTALL = (
     f"python -m pip install --no-deps 'easymode @ git+https://github.com/mgflast/easymode.git@{EASYMODE_COMMIT}'"
 )
