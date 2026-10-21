@@ -11,7 +11,7 @@ pytest.importorskip("tensorflow")
 
 from conftest import make_scnm  # noqa: E402
 
-from copick_easymode.core.scnm import load_scnm  # noqa: E402
+from copick_easymode.core.scnm import _infer_slices, load_scnm  # noqa: E402
 from copick_easymode.core.xla import XLAModel  # noqa: E402
 
 
@@ -70,3 +70,15 @@ def test_a_failing_compiled_call_falls_back_to_the_model_for_good(caplog):
     assert wrapped.fallback == "RuntimeError: libdevice not found at ./libdevice.10.bc"
     [warning] = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert "continuing without XLA" in warning.getMessage() and "libdevice" in warning.getMessage()
+
+
+def test_a_short_last_batch_is_padded_so_one_shape_compiles(tmp_path, caplog):
+    scnm = load_scnm(make_scnm(tmp_path / "models"))
+    compiled = dataclasses.replace(scnm, model=XLAModel(scnm.model, logger=logging.getLogger("xla-test"), name="tiny"))
+    vi = np.random.default_rng(2).normal(size=(3, 16, 24)).astype(np.float32)
+
+    with caplog.at_level(logging.INFO, logger="xla-test"):
+        padded = _infer_slices(compiled, vi, batch_size=2)
+    np.testing.assert_allclose(padded, _infer_slices(scnm, vi, batch_size=2), atol=1e-5)
+    # Slices 0-1, then slice 2 padded to a batch of two: one input shape, one compile.
+    assert [r.getMessage().split(":")[0] for r in caplog.records] == ["XLA compiled tiny for input (2, 16, 24, 4)"]

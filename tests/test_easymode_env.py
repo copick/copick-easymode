@@ -24,7 +24,7 @@ _absent = object()
 
 
 def _distribution(**overrides):
-    """What easymode 1.2.5's ``easymode.core.distribution`` offers this package."""
+    """What easymode 1.2.6's ``easymode.core.distribution`` offers this package."""
     attributes = {
         "MODEL_CACHE_DIR": "/models",
         "REGISTRY_CACHE": "/models/registry.json",
@@ -43,7 +43,7 @@ def fake_easymode(monkeypatch, isolated_env):
     """Install a fake easymode whose distribution is ``install(**overrides)``."""
     for name in [name for name in sys.modules if name == "easymode" or name.startswith("easymode.")]:
         monkeypatch.delitem(sys.modules, name)
-    config = _module("easymode.core.config", settings={"MODEL_DIRECTORY": "/models"}, version="1.2.5")
+    config = _module("easymode.core.config", settings={"MODEL_DIRECTORY": "/models"}, version="1.2.6")
 
     def install(**overrides):
         distribution = _distribution(**overrides)
@@ -116,7 +116,7 @@ def test_a_compatible_easymode_is_used_through_the_boundary(fake_easymode):
     distribution = fake_easymode()
 
     assert easymode_env.import_easymode() is distribution
-    assert easymode_env.easymode_version() == "1.2.5"
+    assert easymode_env.easymode_version() == "1.2.6"
     assert easymode_env.load_network("/models/ribosome.h5") == {"weights": "/models/ribosome.h5"}
     easymode_env.go_offline(distribution)
     assert distribution._online is False
