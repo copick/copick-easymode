@@ -13,6 +13,7 @@ serial result.
 """
 
 import contextlib
+import dataclasses
 import gc
 import os
 import time
@@ -179,6 +180,8 @@ class Stages:
     prepare: Callable[[np.ndarray], Any]
     infer: Callable[[Any], np.ndarray]
     finish: Callable[[np.ndarray, Any], np.ndarray]
+    #: The XLA-compiled model ``infer`` calls (``settings.xla``), whose ``fallback`` says whether it was given up.
+    xla: Any = None
 
 
 def copick_identity(value: str, what: str = "name") -> str:
@@ -207,6 +210,8 @@ class InferenceSettings:
     batch_size: int = 1
     threshold: float = 0.5
     overwrite: bool = False
+    #: Run each model as one XLA-compiled function (:class:`copick_easymode.core.xla.XLAModel`).
+    xla: bool = False
 
     def __post_init__(self):
         if self.user_id is not None:
@@ -258,8 +263,8 @@ class _Item:
 
 
 def new_stats() -> dict:
-    """Processing statistics: counts, error messages and one record per run and model."""
-    return {"processed": 0, "skipped": 0, "errors": [], "items": []}
+    """Processing statistics: counts, error messages, one record per run and model, and each model that gave up XLA."""
+    return {"processed": 0, "skipped": 0, "errors": [], "items": [], "xla_fallbacks": []}
 
 
 class _Quiet:
@@ -419,8 +424,20 @@ def _enable_memory_growth(tf) -> None:
 
 
 def load_stages(model: "ResolvedModel", settings: InferenceSettings, logger=None) -> Stages:
-    """Load a resolved model's weights and bind its three stages to ``settings``."""
+    """Load a resolved model's weights and bind its three stages to ``settings``.
+
+    With ``settings.xla`` the network is wrapped in an :class:`~copick_easymode.core.xla.XLAModel`, which the stages
+    call exactly as they call the plain network, and which ``Stages.xla`` keeps for its fallback.
+    """
     log = logger if logger is not None else _Quiet()
+
+    def compiled(network):
+        if not settings.xla:
+            return None
+        from copick_easymode.core.xla import XLAModel
+
+        return XLAModel(network, logger=logger, name=model.feature)
+
     if model.kind == "scnm":
         from copick_easymode.core.scnm import MAX_TTA, finish_scnm, infer_scnm, load_scnm, prepare_scnm
 
@@ -433,10 +450,14 @@ def load_stages(model: "ResolvedModel", settings: InferenceSettings, logger=None
         )
         if model_tta != settings.tta:
             log.info(f"TTA {settings.tta} reduced to {model_tta}, the most an .scnm model supports")
+        xla = compiled(scnm.model)
+        if xla is not None:
+            scnm = dataclasses.replace(scnm, model=xla)
         return Stages(
             prepare=lambda volume: prepare_scnm(scnm, volume, settings.voxel_size),
             infer=lambda prepared: infer_scnm(scnm, prepared, model_tta),
             finish=lambda raw, prepared: finish_scnm(raw, prepared, model_tta),
+            xla=xla,
         )
 
     # Imported here rather than first inside a stage thread (it configures TensorFlow at import).
@@ -444,10 +465,14 @@ def load_stages(model: "ResolvedModel", settings: InferenceSettings, logger=None
     model_apix = model.apix if model.apix is not None else 10.0
     network = easymode_env.load_network(model.weights)
     log.info(f"Model loaded from {model.weights}, inference at {model_apix} A/px")
+    xla = compiled(network)
+    if xla is not None:
+        network = xla
     return Stages(
         prepare=lambda volume: prepare_tomogram(volume, settings.voxel_size, model_apix),
         infer=lambda prepared: infer_tomogram(network, prepared, settings.tta, settings.batch_size),
         finish=lambda raw, prepared: finish_tomogram(raw, prepared, settings.tta),
+        xla=xla,
     )
 
 
@@ -470,7 +495,8 @@ def segment_with_models(
 ) -> dict:
     """Run every resolved model over ``runs``, one model at a time, freeing each before the next loads.
 
-    A model that fails to load is recorded as an error and the next one still runs.
+    A model that fails to load is recorded as an error and the next one still runs. A model that gave up XLA is
+    recorded in ``stats["xla_fallbacks"]`` with the reason; its runs still count as processed.
     """
     import tensorflow as tf
 
@@ -499,6 +525,8 @@ def segment_with_models(
                 logger=logger,
             )
         finally:
+            if stages is not None and stages.xla is not None and stages.xla.fallback:
+                stats.setdefault("xla_fallbacks", []).append({"feature": model.feature, "reason": stages.xla.fallback})
             # Free the model's GPU memory after every attempt, a failed load included.
             stages = None
             tf.keras.backend.clear_session()
@@ -539,6 +567,7 @@ def run_easymode_inference(
     config_path: Optional[str] = None,
     logger=None,
     model_dir: Optional[str] = None,
+    xla: bool = False,
 ) -> dict:
     """
     Run easymode inference on copick tomograms in this process.
@@ -565,11 +594,13 @@ def run_easymode_inference(
         logger: Logger instance for output messages.
         model_dir: easymode model directory to use instead of easymode's setting (in memory only; default:
             ``$COPICK_EASYMODE_MODEL_DIR``, else the setting).
+        xla: Run each model as one XLA-compiled function (see :mod:`copick_easymode.core.xla`).
 
     Returns:
-        Dictionary with processing statistics: processed, skipped, errors, and items (one record per run
-        and model, with its stage timings). A model that is not found, whose object cannot be added or that
-        fails to load is recorded as an error and the next model still runs.
+        Dictionary with processing statistics: processed, skipped, errors, items (one record per run and
+        model, with its stage timings) and xla_fallbacks (each model that gave up XLA, with the reason). A model
+        that is not found, whose object cannot be added or that fails to load is recorded as an error and the next
+        model still runs.
     """
     stats = new_stats()
     settings = copick_settings(
@@ -582,6 +613,7 @@ def run_easymode_inference(
         batch_size=batch_size,
         threshold=threshold,
         overwrite=overwrite,
+        xla=xla,
         logger=logger,
     )
 

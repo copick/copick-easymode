@@ -10,12 +10,11 @@ If you use this plugin, please cite the easymode preprint (see [Citation](#citat
 
 ## Installation
 
-easymode is not published to PyPI (only older `0.0.x` releases are), so it is installed
-from GitHub. Its packaging metadata also (incorrectly) pins `numpy<2` / `tensorflow<2.12`, which
-conflicts with copick's `numpy>=2` — even though easymode runs fine on `numpy>=2`. To avoid that
-conflict, install copick-easymode and its dependencies **first** (this brings in copick and
-`numpy>=2`), then the supported easymode release (1.2.5) from its source commit with `--no-deps`,
-so its bad pins are ignored:
+easymode's packaging metadata pins `numpy<2` and `tensorflow<2.16` (and `ais-cryoet`, which needs
+Keras 2), which conflicts with copick's `numpy>=2` — even though easymode runs fine on `numpy>=2` and
+Keras 3. To avoid that conflict, install copick-easymode and its dependencies **first** (this brings
+in copick and `numpy>=2`), then the supported easymode release (1.2.6) from its source commit with
+`--no-deps`, so its pins are ignored:
 
 ```bash
 git clone https://github.com/copick/copick-easymode.git
@@ -24,17 +23,17 @@ cd copick-easymode
 # 1. Install copick-easymode + dependencies (copick, numpy>=2, tensorflow>=2.16, easymode's runtime deps)
 pip install -e .
 
-# 2. Install easymode 1.2.5 WITHOUT dependency resolution.
+# 2. Install easymode 1.2.6 WITHOUT dependency resolution.
 #    --no-deps keeps your numpy>=2 stack intact, and also upgrades over any older easymode
-#    (e.g. a 0.0.x already installed from PyPI).
-pip install --no-deps "easymode @ git+https://github.com/mgflast/easymode.git@544572cfc071869113eb0567ef607791946a81c1"
+#    already installed.
+pip install --no-deps "easymode @ git+https://github.com/mgflast/easymode.git@00ab9035b19ad30dca46fbe97bc77e6f11a2d981"
 ```
 
 Verify the install:
 
 ```bash
 python -c "import numpy, easymode, importlib.metadata as m; print('numpy', numpy.__version__, '| easymode', m.version('easymode'))"
-# expected: numpy 2.x | easymode 1.2.5
+# expected: numpy 2.x | easymode 1.2.6
 ```
 
 copick-easymode imports easymode in one place, `copick_easymode.core.easymode_env`. A missing easymode, or one
@@ -63,6 +62,9 @@ copick inference easymode -c config.json -m ribosome -t wbp@10.0 --cpu
 
 # High quality with test-time augmentation
 copick inference easymode -c config.json -m ribosome -t wbp@10.0 --tta 16
+
+# XLA-compiled inference, about 3x faster on a GPU
+copick inference easymode -c config.json -m microtubule -t wbp@10.0 --xla
 
 # Don't add object definitions to config
 copick inference easymode -c config.json -m ribosome -t wbp@10.0 --no-add-objects
@@ -108,6 +110,16 @@ in the command's own process.
   cannot collide.
 - **Config writes.** With `--add-objects`, only the parent process adds object definitions and saves the config,
   before the workers start; workers re-open the project from the config file and never write it.
+- **XLA.** `--xla` runs each model's forward pass as one XLA-compiled function (`tf.function(jit_compile=True)`),
+  which fuses the memory-bound work between the convolutions, like `easymode segment --xla` (easymode 1.2.6) and
+  `ais segment --xla` (ais-cryoet 1.2.40). Each worker compiles at the first call of each input
+  shape, which takes tens of seconds and is logged as `XLA compiled <feature> for input (...)`, and reuses it for every
+  later tile of that shape. On 10521 tomograms of 320 x 772 x 548 voxels, at TTA 4 on one L40S with TensorFlow 2.21,
+  it took the microtubule `.h5` network from 310 s to 107 s per tomogram, 2.9x, and the actin `.scnm` slab model from
+  87 s to 67 s, 1.3x. The masks matched the plain model's to an IoU of 0.9998 or better. If compiling fails, the
+  worker logs one warning, continues with the plain model and lists the model with the reason in its `xla_fallbacks`
+  in the report. It is off by default because a missing or too old `ptxas` can abort TensorFlow instead of raising an
+  error.
 - **Logs** of each worker start with `[worker k gpu X]`.
 
 ### Exit status and report
@@ -124,18 +136,19 @@ the end (`"complete"` or `"failed"`), whatever the outcome:
   "tool": "copick-easymode", "version": "0.3.0", "status": "complete",
   "config": "/data/copick_config.json", "tomogram": "wbp@10.0", "runs": ["TS_01", "TS_02", "TS_03"],
   "user_id": "copick", "session_id": "1", "tta": 4, "threshold": 0.5, "batch_size": 1, "overwrite": false,
-  "models_requested": ["microtubule"],
+  "xla": false, "models_requested": ["microtubule"],
   "models": [{"feature": "microtubule", "object": "microtubule", "weights": "/shared/easymode/models/microtubule_sv3-3d.h5",
               "kind": "h5", "tag": "sv3-3d", "timestamp": "20260916223602", "bytes": 515770304, "apix": 10.0}],
-  "missing": {}, "model_directory": "/shared/easymode", "online": true, "writable": true, "easymode_version": "1.2.5",
+  "missing": {}, "model_directory": "/shared/easymode", "online": true, "writable": true, "easymode_version": "1.2.6",
   "cpu": false, "devices": ["0", "1"], "threads_per_worker": 8,
   "workers": [
     {"index": 0, "gpu": "0", "runs": ["TS_01", "TS_03"], "exitcode": 0, "seconds": 412.3, "processed": 2, "skipped": 0,
      "errors": [], "visible_devices": "0", "threads": 8,
      "items": [{"run": "TS_01", "feature": "microtubule", "status": "processed",
-                "seconds": {"read": 2.1, "prepare": 1.9, "infer": 198.0, "finish": 1.2, "write": 0.8}}]},
+                "seconds": {"read": 2.1, "prepare": 1.9, "infer": 198.0, "finish": 1.2, "write": 0.8}}],
+     "xla_fallbacks": []},
     {"index": 1, "gpu": "1", "runs": ["TS_02"], "exitcode": 0, "seconds": 205.7, "processed": 1, "skipped": 0,
-     "errors": [], "visible_devices": "1", "threads": 8, "items": []}
+     "errors": [], "visible_devices": "1", "threads": 8, "items": [], "xla_fallbacks": []}
   ],
   "processed": 3, "skipped": 0, "errors": [],
   "started_utc": "2026-10-08T20:00:00Z", "finished_utc": "2026-10-08T20:06:55Z", "seconds": 414.9
@@ -144,7 +157,8 @@ the end (`"complete"` or `"failed"`), whatever the outcome:
 
 `missing` names each model that could not be resolved, with easymode's reason. A worker's `gpu` is the
 `CUDA_VISIBLE_DEVICES` value it ran with (`null` with `--cpu`), and its `exitcode` is its process exit status (0 when
-all of its runs were handled without an error).
+all of its runs were handled without an error). With `--xla`, a worker's `xla_fallbacks` lists each model that fell
+back to plain inference, as `{"feature": ..., "reason": ...}`; its runs still count as processed.
 
 ### Python API
 
@@ -161,7 +175,7 @@ easymode publishes them in two formats, and both run in the same process and on 
 - **`.h5` (3D)**: `ribosome`, `microtubule` and `tric`, loaded through `easymode.core.distribution.load_model`.
 - **`.scnm` (Ais 2D-engine models, 2.5D slice or 3D slab)**: every other feature, e.g. `actin`, `membrane`,
   `proteasome`, `atp_synthase`, `cytoplasm`, `nucleus`. `copick_easymode.core.scnm` loads them in Keras 3 and runs
-  a port of `ais segment`'s inference (Ais 1.2.38), so neither Ais nor its TensorFlow 2.11 is needed. `--tta` above 8
+  a port of `ais segment`'s inference (Ais 1.2.40), so neither Ais nor its TensorFlow 2.11 is needed. `--tta` above 8
   is reduced to 8 for these, the most Ais supports.
 
 copick does not allow underscores in object names, so a feature such as `atp_synthase` is written to copick as
@@ -187,6 +201,7 @@ IDs, so a rerun finds them.
 | `--tta` | Test-time augmentation level 1-16 (8 at most for an `.scnm` model). Higher = better but slower. Default: 4 |
 | `--batch-size` | Batch size for inference. Default: 1 |
 | `--threshold` | Probability threshold for binarizing a segmentation. Default: 0.5 |
+| `--xla/--no-xla` | Run each model as one XLA-compiled function: up to about 3x faster on a GPU, most for the 3D `.h5` networks. Default: disabled |
 | `--add-objects/--no-add-objects` | Add object definitions to config if missing. Default: enabled |
 | `--overwrite/--no-overwrite` | Overwrite existing segmentations. Default: disabled |
 | `--user-id` | User ID for created segmentations. Default: copick |
@@ -221,7 +236,7 @@ ready, so a run whose inference fails leaves it untouched.
 - copick >= 1.24.1
 - numpy >= 2.0.2
 - TensorFlow >= 2.16
-- easymode 1.2.5, commit `544572cfc071869113eb0567ef607791946a81c1` (installed separately; see [Installation](#installation))
+- easymode 1.2.6, commit `00ab9035b19ad30dca46fbe97bc77e6f11a2d981` (installed separately; see [Installation](#installation))
 
 ## Citation
 

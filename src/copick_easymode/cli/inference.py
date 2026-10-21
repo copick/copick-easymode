@@ -13,7 +13,7 @@ from copick.cli.util import add_config_option, add_debug_option, add_user_sessio
 
 def add_easymode_inference_options(func: click.Command) -> click.Command:
     """
-    Add easymode inference options: --tta, --batch-size, --threshold.
+    Add easymode inference options: --tta, --batch-size, --threshold, --xla.
 
     Args:
         func (click.Command): The Click command to which the options will be added.
@@ -45,6 +45,15 @@ def add_easymode_inference_options(func: click.Command) -> click.Command:
             default=0.5,
             show_default=True,
             help="Probability threshold for binarizing segmentation (0.0-1.0).",
+        ),
+        click.option(
+            "--xla/--no-xla",
+            is_flag=True,
+            default=False,
+            show_default=True,
+            help="Run each model as one XLA-compiled function: up to about 3x faster on a GPU, most for the 3D .h5 "
+            "networks, after a compile of seconds to tens of seconds per worker. A model that fails to compile falls "
+            "back to plain inference, but a missing ptxas can abort TensorFlow.",
         ),
     ]
 
@@ -229,6 +238,7 @@ def easymode(
     tta: int,
     batch_size: int,
     threshold: float,
+    xla: bool,
     gpus: str,
     cpu: bool,
     max_workers: int,
@@ -276,6 +286,9 @@ def easymode(
 
         # High quality inference with TTA
         copick inference easymode -c config.json -m ribosome -t wbp@10.0 --tta 16 --batch-size 2
+
+        # XLA-compiled inference, about 3x faster on a GPU
+        copick inference easymode -c config.json -m microtubule -t wbp@10.0 --xla
 
         # Skip adding object definitions to config
         copick inference easymode -c config.json -m ribosome -t wbp@10.0 --no-add-objects
@@ -368,7 +381,7 @@ def easymode(
     logger.info(f"Models: {model_list}")
     logger.info(f"Tomogram: {tomo_type}@{voxel_size}")
     logger.info(f"Runs: {run_list if run_list else 'all'}")
-    logger.info(f"TTA: {tta}, Batch size: {batch_size}, Threshold: {threshold}")
+    logger.info(f"TTA: {tta}, Batch size: {batch_size}, Threshold: {threshold}, XLA: {xla}")
     logger.info(f"GPUs: {'none (--cpu)' if cpu else gpus if gpus else 'all of the allocation'}")
     logger.info(f"Add objects: {add_objects}, Overwrite: {overwrite}")
 
@@ -385,6 +398,7 @@ def easymode(
         batch_size=batch_size,
         threshold=threshold,
         overwrite=overwrite,
+        xla=xla,
         gpus=gpus,
         cpu=cpu,
         max_workers=max_workers,
